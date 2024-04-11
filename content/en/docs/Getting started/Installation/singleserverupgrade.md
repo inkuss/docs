@@ -15,7 +15,7 @@ A FOLIO instance is divided into two main components.  The first component is Ok
 
 This is a documentation for an **upgrade** of your FOLIO system. 
 
-* It assumes that you have already successfully installed a FOLIO system and now want to upgrade your system to Orchid. 
+* It assumes that you have already successfully installed a FOLIO system and now want to upgrade your system to Poppy. 
 
 * If you are deploying FOLIO for the first time, or if you want to start with a fresh installation for whatever reasons, see [how to do a **fresh installation**]({{< ref "singleserverfreshinstall.md" >}}) of a single server deployment.
 
@@ -30,7 +30,8 @@ This is a documentation for an **upgrade** of your FOLIO system.
 | **System Type**                     | **Version referred to in this manual**     |
 |-------------------------------------|--------------------------------------------|
 | Operating system                    | Ubuntu 22.04.2 LTS 64-bits                 |
-| FOLIO system to migrate from        | Nolana HF#1 (R3-2022-hotfix-1)             |
+| FOLIO system to migrate from        | Orchid CSP#5 (R1-2023-CSP-5)               |
+
 
 **Hardware requirements**
 
@@ -53,23 +54,23 @@ sudo reboot
 ```
 Check if all Services have been restarted after reboot: <em>Okapi, postgres, docker, the docker containers</em> (do: docker ps --all | more ) <em>, Stripes and nginx.</em>
 
-Read carefully the [Orchid Release Notes](https://wiki.folio.org/display/REL/Orchid+%28R1+2023%29+Release+Notes).
+These are the [Poppy Release Notes](https://folio-org.atlassian.net/wiki/spaces/REL/pages/5210730/Poppy+R2+2023+Release+Notes)
 Do these actions before the upgrade:
 
-From Orchid Release Notes:
+From Poppy Release Notes:
 
 ### More preparatory steps
 There might be more preparatory steps that you need to take into account for your installation. If you are unsure what other steps you might need to take, study carefully the Release Notes.  Do all actions in the column "Action required", as appropriate for your installation.
 
 
-## II. Reinstall the Backend, Migrate from Nolana to Orchid
+## II. Reinstall the Backend, Migrate from Orchid to Poppy
 ### II.i) Fetch a new version of platform-complete
 Fetch the new release version of platform-complete, change into that directory: 
 ```
 cd platform-complete
 git fetch
 ```
-There is a branch R1-2023-csp-5 (released on August 17, 2023). We will deploy this version.
+There is a branch R2-2023-csp-3 (released on April 11, 2024). We will deploy this version.
 Check out this Branch.
 Stash local changes. This should only pertain to stripes.config.js .
 Discard any changes which you might have made on the install-jsons:
@@ -83,20 +84,42 @@ git restore package.json
 git stash save
 git checkout master
 git pull
-git checkout R1-2023-csp-5
+git checkout R2-2023-csp-3
 git stash pop
 ```
 
 ### II.ii) Upgrade Okapi
 Upgrade the Okapi version and restart Okapi.
-Read the Orchid Okapi version from install.json: **okapi-5.0.1**
+Read the Poppy Okapi version from install.json: **okapi-5.1.2**
 
 Update the Okapi Debian package:
 ```
 sudo add-apt-repository "deb https://repository.folio.org/packages/ubuntu focal/"
 sudo apt-get update
-sudo apt-get -y --allow-change-held-packages install okapi=5.0.1-1
+sudo apt-get -y --allow-change-held-packages install okapi=5.1.2-1
 ```
+   E: Version '5.1.2-1' for 'okapi' was not found
+
+  Okapi im Container bauen 
+  Okapi ausleihen: https://github.com/folio-org/okapi/tree/master/okapi-core
+```
+  git clone https://github.com/folio-org/okapi.git
+  cd okapi
+  git checkout v5.1.2
+  cd okapi-core
+  #docker run -p 9130:9130 -e JAVA_OPTIONS="-Dloglevel=DEBUG" folioorg/okapi:5.1.2 dev
+  nohup docker run -p 9130:9130 --name okapi folioorg/okapi:5.1.2 dev &
+```
+  
+            es gibt schon ein Image, dieses benutzen (s. Doku dort: "To run with Docker")
+    dann die okapi.conf docker mitgeben (/etc/folio/okapi/okapi.conf); wie geht das ?
+       Tobias: docker run -v /hostordner/okapi.conf:/ordnerincontainer/okapi.conf
+       Tobias: ODER docker-compose benutzen.
+    ALTERNATIV: Alle Env-Variablen einzeln mit -e an docker übergeben (klingt eher komplizierter)
+    ODER die okapi.conf in dem Dockerfile kopieren (dann muss ich aber den Container aber selber bauen)
+    "Frage der Philosophie" Florian Kreft: "Besser das bereitgestellte Image benutzen und conf-Datei mitschicken".
+    Das Log auf stdout umleiten; dann das log mit docker logs <okapi> angucken.
+
 
 Make sure Okapi's port range doesn't collide with Elasticsearch's standard port 9200, if you are using that port for ES.
 Change Okapi's port range, edit okapi.conf:
