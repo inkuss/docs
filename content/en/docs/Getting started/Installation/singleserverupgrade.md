@@ -108,12 +108,52 @@ sudo apt-get -y --allow-change-held-packages install okapi=5.1.2-1
   git checkout v5.1.2
   cd okapi-core
   #docker run -p 9130:9130 -e JAVA_OPTIONS="-Dloglevel=DEBUG" folioorg/okapi:5.1.2 dev
-  nohup docker run -p 9130:9130 --name okapi folioorg/okapi:5.1.2 dev &
+  nohup docker run -p 9130:9130 -v /etc/folio/okapi:/usr/verticles/okapi --name okapi folioorg/okapi:5.1.2 dev &
+  nohup docker run -p 9130:9130 -v /etc/folio/okapi:/usr/verticles/okapi --name okapi folioorg/okapi:5.1.2 dev -conf /usr/verticles/okapi/okapi.conf & 
 ```
-  
-            es gibt schon ein Image, dieses benutzen (s. Doku dort: "To run with Docker")
+    Jetzt noch die okapi.conf ins JSON-Format umwandeln => okapi.json
+    Braucht man auch die env vars in okapi.env ??
+    # Add additional JVM space separated options here.
+OKAPI_JAVA_OPTS="-Djava.awt.headless=true"
+# Default Okapi settings
+OKAPI_USER="okapi"
+OKAPI_GROUP="okapi"
+CONF_DIR="/etc/folio/okapi"
+LIB_DIR="/usr/share/folio/okapi/lib"
+DATA_DIR="/var/lib/okapi"
+PID_DIR="/var/run/okapi"
+    okapi.sh, okapi.env wird nicht mehr benötigt (in https://github.com/folio-org/okapi/tree/master/dist )
+    Als Flag --net=host setzen 
+
+Hier eine Vorlage für okapi.json:
+{
+  "role": "dev"=host,
+  "enable_metrics": 0,
+  "carbon_host": "localhost",
+  "carbon_port": "2003",
+  "port": "9130",
+  "port_start": "9131",
+  "port_end": "9661",
+  "host": "<YOUR_IP_ADDRESS>",
+  "storage": "postgres",
+  "okapiurl": "http://<YOUR_IP_ADDRESS>:9130",
+  "dockerUrl": "http://localhost:4243",
+  "postgres_host": "<YOUR_IP_ADDRESS>",
+  "postgres_port": "5432",
+  "postgres_username": "<DB_OKAPI_USER>",
+  "postgres_password": "<DB_OKAPI_PW>",
+  "postgres_database": "<DB_OKAPI_DB>",
+  "token_cache_max_size": "10000",
+  "token_cache_ttl_ms": "180000",
+  "deploy_waitIterations": "60",
+  "loglevel": "INFO",
+  "log4j_config": "okapi/log4j2.properties",
+  "vertx_cache_dir_base": "/tmp/vertx-cache-okapi"
+}
+ 
+    Julian: es gibt schon ein Image, dieses benutzen (s. Doku dort: "To run with Docker")
     dann die okapi.conf docker mitgeben (/etc/folio/okapi/okapi.conf); wie geht das ?
-       Tobias: docker run -v /hostordner/okapi.conf:/ordnerincontainer/okapi.conf
+       Tobias: docker run -v /etc/folio/okapi:/usr/verticles/okapi
        Tobias: ODER docker-compose benutzen.
     ALTERNATIV: Alle Env-Variablen einzeln mit -e an docker übergeben (klingt eher komplizierter)
     ODER die okapi.conf in dem Dockerfile kopieren (dann muss ich aber den Container aber selber bauen)
