@@ -101,48 +101,32 @@ sudo apt-get -y --allow-change-held-packages install okapi=5.1.2-1
    E: Version '5.1.2-1' for 'okapi' was not found
 
   Okapi im Container bauen 
-  Okapi ausleihen: https://github.com/folio-org/okapi/tree/master/okapi-core
-```
-  git clone https://github.com/folio-org/okapi.git
-  cd okapi
-  git checkout v5.1.2
-  cd okapi-core
-  #docker run -p 9130:9130 -e JAVA_OPTIONS="-Dloglevel=DEBUG" folioorg/okapi:5.1.2 dev
-  nohup docker run -p 9130:9130 -v /etc/folio/okapi:/usr/verticles/okapi --name okapi folioorg/okapi:5.1.2 dev &
-  nohup docker run -p 9130:9130 -v /etc/folio/okapi:/usr/verticles/okapi --name okapi folioorg/okapi:5.1.2 dev -conf /usr/verticles/okapi/okapi.conf & 
-```
-    Jetzt noch die okapi.conf ins JSON-Format umwandeln => okapi.json
-    Braucht man auch die env vars in okapi.env ??
-    # Add additional JVM space separated options here.
-OKAPI_JAVA_OPTS="-Djava.awt.headless=true"
-# Default Okapi settings
-OKAPI_USER="okapi"
-OKAPI_GROUP="okapi"
-CONF_DIR="/etc/folio/okapi"
-LIB_DIR="/usr/share/folio/okapi/lib"
-DATA_DIR="/var/lib/okapi"
-PID_DIR="/var/run/okapi"
-    okapi.sh, okapi.env wird nicht mehr benötigt (in https://github.com/folio-org/okapi/tree/master/dist )
-    Als Flag --net=host setzen 
-
+  # Okapi ausleihen: https://github.com/folio-org/okapi/tree/master/okapi-core ==> braucht man nicht, ich nehme ein Image
+  # git clone https://github.com/folio-org/okapi.git
+  # cd okapi
+  # git checkout v5.1.2
+  # cd okapi-core
+  Die okapi.conf ins JSON-Format umwandeln => okapi.json
+  sudo su
+  cd /etc/folio/okapi
 Hier eine Vorlage für okapi.json:
 {
-  "role": "dev"=host,
+  "role": "dev",
   "enable_metrics": 0,
   "carbon_host": "localhost",
   "carbon_port": "2003",
   "port": "9130",
-  "port_start": "9131",
-  "port_end": "9661",
+  "port_start": "9400",
+  "port_end": "10400",
   "host": "<YOUR_IP_ADDRESS>",
   "storage": "postgres",
-  "okapiurl": "http://<YOUR_IP_ADDRESS>:9130",
-  "dockerUrl": "http://localhost:4243",
   "postgres_host": "<YOUR_IP_ADDRESS>",
   "postgres_port": "5432",
   "postgres_username": "<DB_OKAPI_USER>",
   "postgres_password": "<DB_OKAPI_PW>",
   "postgres_database": "<DB_OKAPI_DB>",
+  "dockerurl": "http://localhost:4243",
+  "okapiurl": "http://<YOUR_IP_ADDRESS>:9130",
   "token_cache_max_size": "10000",
   "token_cache_ttl_ms": "180000",
   "deploy_waitIterations": "60",
@@ -150,15 +134,45 @@ Hier eine Vorlage für okapi.json:
   "log4j_config": "okapi/log4j2.properties",
   "vertx_cache_dir_base": "/tmp/vertx-cache-okapi"
 }
+
+```
+  sudo su
+  nohup docker run -p 9130:9130 --network=host -e JAVA_OPTIONS="-Dloglevel=DEBUG" -v /etc/folio/okapi:/usr/verticles/okapi --name okapi folioorg/okapi:5.1.2 dev -conf /usr/verticles/okapi/okapi.json & 
+```
+    # Braucht man auch die env vars in /usr/folio/okapi/dist/okapi.env ?
+    # => okapi.sh, okapi.env wird nicht mehr benötigt (in https://github.com/folio-org/okapi/tree/master/dist )
+
  
-    Julian: es gibt schon ein Image, dieses benutzen (s. Doku dort: "To run with Docker")
-    dann die okapi.conf docker mitgeben (/etc/folio/okapi/okapi.conf); wie geht das ?
-       Tobias: docker run -v /etc/folio/okapi:/usr/verticles/okapi
-       Tobias: ODER docker-compose benutzen.
     ALTERNATIV: Alle Env-Variablen einzeln mit -e an docker übergeben (klingt eher komplizierter)
     ODER die okapi.conf in dem Dockerfile kopieren (dann muss ich aber den Container aber selber bauen)
     "Frage der Philosophie" Florian Kreft: "Besser das bereitgestellte Image benutzen und conf-Datei mitschicken".
-    Das Log auf stdout umleiten; dann das log mit docker logs <okapi> angucken.
+    Das Log auf stdout umleiten; dann das log mit docker logs <okapi> angucken. // das scheint schon standardmäßig auf stdout geleitet zu werden.
+
+docker logs -f okapi
+WARN  ?                    Deployment of mod-<irgendwas> failed (ignored): null
+11:08:31 [] [] [] [] ERROR ?                    No running instances for module mod-permissions-6.3.2. Can not invoke /_/tenantpermissions
+
+Alternatives Deployen mit docker-compose:
+cd /usr/folio/okapi-docker-compose
+cat docker-compose.yml 
+version: '3'
+
+services:
+  okapi:
+    image: "folioorg/okapi:5.1.2"
+    container_name: okapi
+    volumes:
+      - /etc/folio/okapi:/usr/verticles/okapi:ro
+    network_mode: host
+    restart: always
+    command: "dev -conf okapi/okapi.json"
+    environment:
+      JAVA_OPTIONS: "-Djava.awt.headless=true"
+    labels:
+      service: okapi
+sudo su
+docker-compose up -d
+Die Fehlermeldungen bleiben dieselben wie beim Start mit docker.
 
 
 Make sure Okapi's port range doesn't collide with Elasticsearch's standard port 9200, if you are using that port for ES.
