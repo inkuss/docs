@@ -92,109 +92,31 @@ git stash pop
 Upgrade the Okapi version and restart Okapi.
 Read the Poppy Okapi version from install.json: **okapi-5.1.2**
 
-Update the Okapi Debian package:
+Set JAVA_HOME in .profile if you haven't already done so
 ```
-sudo add-apt-repository "deb https://repository.folio.org/packages/ubuntu focal/"
-sudo apt-get update
-sudo apt-get -y --allow-change-held-packages install okapi=5.1.2-1
-```
-   E: Version '5.1.2-1' for 'okapi' was not found
-
-  Okapi im Container bauen 
-  # Okapi ausleihen: https://github.com/folio-org/okapi/tree/master/okapi-core ==> braucht man nicht, ich nehme ein Image
-  # git clone https://github.com/folio-org/okapi.git
-  # cd okapi
-  # git checkout v5.1.2
-  # cd okapi-core
-  Die okapi.conf ins JSON-Format umwandeln => okapi.json
-  sudo su
-  cd /etc/folio/okapi
-Hier eine Vorlage für okapi.json:
-{
-  "role": "dev",
-  "enable_metrics": 0,
-  "carbon_host": "localhost",
-  "carbon_port": "2003",
-  "port": "9130",
-  "port_start": "9400",
-  "port_end": "10400",
-  "host": "<YOUR_IP_ADDRESS>",
-  "storage": "postgres",
-  "postgres_host": "<YOUR_IP_ADDRESS>",
-  "postgres_port": "5432",
-  "postgres_username": "<DB_OKAPI_USER>",
-  "postgres_password": "<DB_OKAPI_PW>",
-  "postgres_database": "<DB_OKAPI_DB>",
-  "dockerurl": "http://localhost:4243",
-  "okapiurl": "http://<YOUR_IP_ADDRESS>:9130",
-  "token_cache_max_size": "10000",
-  "token_cache_ttl_ms": "180000",
-  "deploy_waitIterations": "60",
-  "loglevel": "INFO",
-  "log4j_config": "okapi/log4j2.properties",
-  "vertx_cache_dir_base": "/tmp/vertx-cache-okapi"
-}
-
-```
-  sudo su
-  nohup docker run -p 9130:9130 --network=host -e JAVA_OPTIONS="-Dloglevel=DEBUG" -v /etc/folio/okapi:/usr/verticles/okapi --name okapi folioorg/okapi:5.1.2 dev -conf /usr/verticles/okapi/okapi.json & 
-```
-    # Braucht man auch die env vars in /usr/folio/okapi/dist/okapi.env ?
-    # => okapi.sh, okapi.env wird nicht mehr benötigt (in https://github.com/folio-org/okapi/tree/master/dist )
-
- 
-    ALTERNATIV: Alle Env-Variablen einzeln mit -e an docker übergeben (klingt eher komplizierter)
-    ODER die okapi.conf in dem Dockerfile kopieren (dann muss ich aber den Container aber selber bauen)
-    "Frage der Philosophie" Florian Kreft: "Besser das bereitgestellte Image benutzen und conf-Datei mitschicken".
-    Das Log auf stdout umleiten; dann das log mit docker logs <okapi> angucken. // das scheint schon standardmäßig auf stdout geleitet zu werden.
-
-docker logs -f okapi
-WARN  ?                    Deployment of mod-<irgendwas> failed (ignored): null
-11:08:31 [] [] [] [] ERROR ?                    No running instances for module mod-permissions-6.3.2. Can not invoke /_/tenantpermissions
-
-Alternatives Deployen mit docker-compose:
-cd /usr/folio/okapi-docker-compose
-cat docker-compose.yml 
-version: '3'
-
-services:
-  okapi:
-    image: "folioorg/okapi:5.1.2"
-    container_name: okapi
-    volumes:
-      - /etc/folio/okapi:/usr/verticles/okapi:ro
-    network_mode: host
-    restart: always
-    command: "dev -conf okapi/okapi.json"
-    environment:
-      JAVA_OPTIONS: "-Djava.awt.headless=true"
-    labels:
-      service: okapi
-sudo su
-docker-compose up -d
-Die Fehlermeldungen bleiben dieselben wie beim Start mit docker.
-
-
-Make sure Okapi's port range doesn't collide with Elasticsearch's standard port 9200, if you are using that port for ES.
-Change Okapi's port range, edit okapi.conf:
-```
-cd /etc/folio/okapi
-edit okapi.conf
-   port_start="19000"
-   port_end="20000"
+  echo export JAVA_HOME=`readlink -f /usr/bin/javac | sed "s:bin/javac::"` >> ~/.profile
+  source ~/.profile
 ```
 
-Check Okapi logging properties in /etc/folio/okapi. Check that this line is in okapi.conf:
+Build Okapi from source
 ```
-log4j_config="/etc/folio/okapi/log4j2.properties"
+  cd /usr/folio/okapi
+  git fetch
+  git checkout v5.2.1
+  mvn clean install -DskipTests=true
+    ...
+    [INFO] BUILD SUCCESS
 ```
-Edit log4j2.properties. Make sure Okapi logs into a file and define a RollingFileAppender.
 
-Restart Okapi:
-
+If you have built Okapi from source for the first time you may need to adjust LIB_DIR in /etc/default/okapi so that the Okapi service script (/lib/systemd/system/okapi.service) will find the newly built jar file:
 ```
-sudo systemctl daemon-reload
-sudo systemctl restart okapi.service
+  edit /etc/default/okapi
+  LIB_DIR="/usr/folio/okapi/okapi-core/target"
+```
+
+Restart Okapi
+```
+  sudo systemctl restart okapi
 ```
 
 Follow /var/log/folio/okapi/okapi.log . 
@@ -203,9 +125,9 @@ Now Okapi will re-start your modules. Follow the okapi.log. It will run for 5 mi
 
 ```
 docker ps | grep "mod-" | wc
-  62
+  65
 ```
-The above number applies if you had installed a complete platform of Nolana.
+The above number applies if you had installed a complete platform of Orchid, previously.
 
 Retrieve the list of modules which are now being enabled for your tenant (just for your information):
 
@@ -213,11 +135,11 @@ Retrieve the list of modules which are now being enabled for your tenant (just f
 curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules
 ...
 }, {
-  "id" : "okapi-5.0.1"
+  "id" : "okapi-5.2.1"
 } ]
 ```
 
-If you are starting with a complete platform of Nolana, you will see 9 Edge modules, 59 Frontend modules (folio_\*), 62 Backend modules (mod-\*) and the Orchid version of Okapi (5.0.1).
+If you are starting with a complete platform of Orchid, you will see 9 Edge modules, 59 Frontend modules (folio_\*), 65 Backend modules (mod-\*) and the Poppy version of Okapi (5.2.1).
 
 ### II.iii) Pull module descriptors from the central registry
 
