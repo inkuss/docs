@@ -43,8 +43,6 @@ This is a documentation for an **upgrade** of your FOLIO system.
 
 ## I. Before the Upgrade
 
-First do a snapshot of your system, so you will be able to replay the current status in case the upgrade fails.
-
 First do Ubuntu Updates & Upgrades
   
 ```
@@ -63,7 +61,7 @@ From Poppy Release Notes:
 There might be more preparatory steps that you need to take into account for your installation. If you are unsure what other steps you might need to take, study carefully the Release Notes.  Do all actions in the column "Action required", as appropriate for your installation.
 
 
-## II. Reinstall the Backend, Migrate from Orchid to Poppy
+## II. Upgrade Okapi and Prepare Backend Upgrade
 ### II.i) Fetch a new version of platform-complete
 Fetch the new release version of platform-complete, change into that directory: 
 ```
@@ -143,7 +141,7 @@ If you are starting with a complete platform of Orchid, you will see 9 Edge modu
 
 ### II.iii) Pull module descriptors from the central registry
 
-A module descriptor declares the basic module metadata (id, name, etc.), specifies the module's dependencies on other modules (interface identifiers to be precise), and reports all "provided" interfaces. As part of the continuous integration process, each module descriptor  is published to the FOLIO Registry at https://folio-registry.dev.folio.org.
+A module descriptor declares the basic module metadata (id, name, etc.), specifies the module's dependencies on other modules (interface identifiers to be precise), and reports all "provided" interfaces. As part of the continuous integration process, each module descriptor is published to the FOLIO Registry at https://folio-registry.dev.folio.org.
 
 ```
 curl -w '\n' -D - -X POST -H "Content-type: application/json" \
@@ -152,16 +150,16 @@ curl -w '\n' -D - -X POST -H "Content-type: application/json" \
 Okapi log should show something like
 
 ```
- INFO  ProxyContext         510602/proxy REQ 127.0.0.1:49950 supertenant POST /_/proxy/pull/modules  okapi-5.0.1
+ INFO  ProxyContent         759951/proxy REQ 127.0.0.1:58954 supertenant POST /_/proxy/pull/modules okapi-5.2.1
  INFO  PullManager          Remote registry at https://folio-registry.dev.folio.org is version 5.0.1
  INFO  PullManager          pull smart
-  ...
- INFO  PullManager          pull: 3653 MDs to insert
- INFO  ProxyContent         510602/proxy RES 200 38836856us okapi-5.0.1 /_/proxy/pull/modules
+ INFO  PullManager          pull: 1440 MDs to insert
+ INFO  ProxyContent         759951/proxy RES 200 32114437us okapi-5.2.1 /_/proxy/pull/modules
 ```
 
 
-### II.iv) Pre-Upgrade
+### II.iv) Configure Module Environment Variables
+This part is the one in which a system operator needs to take the most care and will probably spend the most time on.
 
 Check your Okapi environment:
 
@@ -178,38 +176,34 @@ Make sure SYSTEM_USER_PASSWORD in /\_/env is the actual password for these syste
   - pub-sub
   - mod-search
   - data-export-system-user
+  - mod-entities-links
+  - mod-innreach   (if you are utilizing this module)
 
 Log in as these users with this password. If that doesn't work, change the password of these system users to the value of the system variable SYSTEM_USER_PASSWORD.
 
-If you are in a multi-tenant environment, set environment variable ENV to ENV = orchid . In a single tenant environment, you don't need to set it . It has the default value ENV = folio.
+#### i. Set environment varianle env (only required in a multi-tenant environment)
+If you are in a multi-tenant environment, set environment variable ENV to ENV = poppy . In a single tenant environment, you don't need to set it . It has the default value ENV = folio.
 ```
-curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"ENV\",\"value\":\"orchid\"}" http://localhost:9130/_/env
+curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"ENV\",\"value\":\"poppy\"}" http://localhost:9130/_/env
 ```
   
 From Orchid release notes, do these steps:
-### i. Incompatible Hazelcast version in mod-remote-storage
-When running Nolana and Orchid version of mod-remote-storage in parallel they need distinct Hazelcast configurations. One possibility is to use different Hazelcast cluster name environment variables:
+#### ii. Incompatible Hazelcast version in mod-remote-storage
+During the upgrade, the Orchid and Poppy versions of mod-remote-storage will run in parallel. This will only work if they are on different Hazelcast clusters. Set the Hazelcast cluster name for the Poppy version to "poppy":
 ```
-HZ_CLUSTERNAME=nolana (mod-remote-storage-1.7.2)
-HZ_CLUSTERNAME=orchid (mod-remote-storage-2.0.3)
+  # Configure mod-remote-storage-3.0.1 (Poppy version)
+  cd ~/folio-install
+  # 1. Copy the module descriptor into a file
+  curl -w '\n' -D -  http://localhost:9130/_/proxy/modules/mod-remote-storage-3.0.1 > mod-remote-storage-3.0.1-module-descriptor.json
+  # 2. Add env var in launch descriptor manually :
+      "name" : "HZ_CLUSTERNAME", "value" : "poppy"
+  # 3. Delete the module descriptor
+  curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-remote-storage-3.0.1
+  # 4. Send the new module descriptor to /_/proxy/modules
+   curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-remote-storage-3.0.1-module-descriptor.json http://localhost:9130/_/proxy/modules
 ```
 
-### ii. Data Import jobs for update of >5000 MARC records
-If you expect to have these kind of data import jobs, increase database connection pool size for mod-source-record-manager-3.6.4 and mod-source-record-storage to 30 (default value is 15). Set the environment variable:
-```
-{
-          "name": "DB_MAXPOOLSIZE",
-          "value": "30"
-}
-```
-Set the newly provided "DB_CONNECTION_TIMEOUT" environment variable to 40 for mod-source-record-storage-5.6.10:
-```
-{
-           "name":"DB_CONNECTION_TIMEOUT",
-           "value": "40"
-}
-```
-### iii. OAI-PMH (mod-oai-pmh) configuration.
+#### iii. OAI-PMH (mod-oai-pmh) configuration.
 Of course you only need to do this if you want to _utilize_ the oai-pmh interface of your (test or demo FOLIO) instance.
 For stable operation, mod-oai-pmh  requires the following memory configuration: 
 ```
@@ -222,22 +216,68 @@ Java: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx1440m
 Amazon Container: cpu - 1024, memory - 1512, memoryReservation - 1360
 ```
 
-### iv. Set jwt.signing.key for mod-authtoken
-In the Launch Descriptor of mod-authtoken-2.13.0, set jwt.signing.key in the JAVA_OPTION to the same value as you have set it in the Nolana version of mod-authtoken(-2.12.0) :
+#### iv. Set jwt.signing.key for mod-authtoken
+In the launch descriptor of mod-authtoken-2.14.1, set jwt.signing.key in the JAVA_OPTION to the same value as you have set it in the Orchid version of mod-authtoken(2.13.0) :
 ```
       "name" : "JAVA_OPTIONS",
       "value" : "-XX:MaxRAMPercentage=66.0 -Dcache.permissions=true -Djwt.signing.key=folio-demo"
 ```
 
-### v. Set env vars for mod-search
-If you have set ENV = orchid, set KAFKA_EVENTS_CONSUMER_PATTERN for mod-search, using the value of ENV as a part of its value:
-    KAFKA_EVENTS_CONSUMER_PATTERN = (orchid\.)(.*\.)inventory\.(instance|holdings-record|item|bound-with)
+Also activate and configure expiring tokens for your tenants in the same launch descriptor (see the README of [mod-authtoken](https://github.com/folio-org/mod-authtoken))
+```
+ }, {
+      "name" : "LEGACY_TOKEN_TENANTS", 
+      "value" : ""
+    }, {
+      "name" : "TOKEN_EXPIRATION_SECONDS",
+      "value" : "tenantId:diku,accessToken:600,refreshToken:604800;tenantId:mytenant,accessToken:3600,refreshToken:604800"
+```
+
+#### v. Set env vars for mod-search-3.0.8
+If you have set ENV = poppy, set KAFKA_EVENTS_CONSUMER_PATTERN for mod-search, using the value of ENV as a part of its value:
+    KAFKA_EVENTS_CONSUMER_PATTERN = (poppy\.)(.*\.)inventory\.(instance|holdings-record|item|bound-with)
     
 If you have set ENV = folio, set  KAFKA_EVENTS_CONSUMER_PATTERN = (folio\.)(.*\.)inventory\.(instance|holdings-record|item|bound-with)
 
 Set SEARCH_BY_ALL_FIELDS_ENABLED to "true" if you want to activate the search option "all" (search in all fields). By default, SEARCH_BY_ALL_FIELDS_ENABLED is set to "false".
 
-### II.v) Deploy a new FOLIO backend and enable all modules of the new platform (backend & frontend)
+  HIER WEITER
+  weiter bei Poppy Release Notes, "Changes & Required Actions", "Inventory, SRS, Data import"
+
+## III. Create new Frontend : Stripes
+
+Create a new frontend (but don't deploy it, yet).
+Install Stripes and nginx in a Docker container. Use the docker file in platform-complete/docker.
+Check if everything looks o.k. in platform-complete/docker. 
+If you have successfully installed last time, you should not need to change anything. Just do a "git diff".
+
+```
+cd ~/platform-complete
+git diff
+```
+
+Check if docker/Dockerfile, docker/nginx.conf and stripes.conifg.js look o.k.
+
+Build the docker container which will contain Stripes and nginx :
+  
+```
+  docker build -f docker/Dockerfile --build-arg OKAPI_URL=http(s)://<YOUR_DOMAIN_NAME>/okapi --build-arg TENANT_ID=diku -t stripes .
+Sending build context to Docker daemon  61.96MB
+Step 1/21 : FROM node:18-alpine as stripes_build
+...
+Step 21/21 : ENTRYPOINT ["/usr/bin/entrypoint.sh"]
+ ---> Running in 71e5acf59c42
+Removing intermediate container 71e5acf59c42
+ ---> 9c2c6b792eec
+Successfully built 9c2c6b792eec
+Successfully tagged stripes:latest
+```
+
+This will run for approximately 10 minutes. 
+
+## IV. Deploy a new FOLIO backend and enable all modules of the new platform (backend & frontend)
+Now do a snapshot of your system, so you will be able to replay the current status in case the upgrade fails.
+Users should stop working with the system now because after the new backend has been deployed, the front end will be incompatible to the backend and will need to be redeployed, too.
 
 Deploy all backend modules of the new release with a single post to okapi's install endpoint. 
 This will deploy and enable all new modules. Start with a simulation run:
@@ -296,7 +336,37 @@ This number is the sum of the following:
 These are all R1-2023 (Orchid) modules.
 
 
-### II.vi) Cleanup
+## IV. Start the new Frontend
+Stop the old Stripes container: 
+systemctl stop stripes
+;docker stop <container id of your old stripes container which is still running>
+
+Start the new stripes container:
+ 
+;Redirect port 80 from the outside to port 80 of the docker container:
+  
+```
+  #cd ~/platform-complete
+  sudo su
+  #nohup docker run -d -p 80:80 stripes &
+  systemctl start stripes
+```
+  
+Log in to your frontend: E.g., go to http://<YOUR_HOST_NAME>/ in your browser. 
+
+  - Can you see the Orchid modules in Settings - Installation details ?
+
+  - Do you see the right okapi version, 5.0.1-1 ? 
+
+  - Does everything look good ?
+
+If so, remove the old stripes container: docker rm \<container id of your old stripes container\> .
+
+It is now possible to access the system via the UI, again.
+However, changes in permission sets and long-running migration jobs still need to be carried out before the system can be used productively.
+
+
+## V. Cleanup
   
 Clean up. 
 Clean up your docker environment: Remove all stopped containers, all networks not used by at least one container, all dangling images and all dangling build cash:
@@ -319,7 +389,7 @@ curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-z3950-
 ### Result
   for Orchid CSP#5
   65 backend modules, "mod-\*" are contained in the list install.json. 
-  Those 65 backend modules are now being enabled for your tenant(s). 
+  Those 65 backend modules are now enabled for your tenant(s). 
   65 containers for those backend modules are running in docker on your system.
 
 Now, finally once again get a list of the deployed backend modules:
@@ -345,57 +415,7 @@ Is everything OK ?
 Congratulations, your Orchid backend is complete and cleaned-up now ! Now, you have to set up a new Stripes instance for the frontend of the tenant.
 
 
-## III. Frontend installation : Stripes
-
-Install Stripes and nginx in a Docker container. Use the docker file in platform-complete/docker.
-Check if everything looks o.k. in platform-complete/docker. 
-If you have successfully installed last time, you should not need to change anything. Just do a "git diff".
-
-```
-cd ~/platform-complete
-git diff
-```
-
-Check if docker/Dockerfile, docker/nginx.conf and stripes.conifg.js look o.k.
-
-Build the docker container which will contain Stripes and nginx :
-  
-```
-  docker build -f docker/Dockerfile --build-arg OKAPI_URL=http(s)://<YOUR_DOMAIN_NAME>/okapi --build-arg TENANT_ID=diku -t stripes .
-Sending build context to Docker daemon  61.96MB
-Step 1/21 : FROM node:18-alpine as stripes_build
-...
-Step 21/21 : ENTRYPOINT ["/usr/bin/entrypoint.sh"]
- ---> Running in 71e5acf59c42
-Removing intermediate container 71e5acf59c42
- ---> 9c2c6b792eec
-Successfully built 9c2c6b792eec
-Successfully tagged stripes:latest
-```
-
-This will run for approximately 10 minutes. 
-
-Stop the old Stripes container: docker stop <container id of your old stripes container which is still running>
-
-Start the new stripes container:
- 
-  Redirect port 80 from the outside to port 80 of the docker container:
-  
-```
-  nohup docker run -d -p 80:80 stripes
-```
-  
-Log in to your frontend: E.g., go to http://<YOUR_HOST_NAME>/ in your browser. 
-
-  - Can you see the Orchid modules in Settings - Installation details ?
-
-  - Do you see the right okapi version, 5.0.1-1 ? 
-
-  - Does everything look good ?
-
-If so, remove the old stripes container: docker rm \<container id of your old stripes container\> .
-
-## IV. Post Upgrade
+## VI. Post Upgrade
 From Orchid release notes:
 ### i. Additional cluster-level permissions are required in Opensearch 
 Before initializing mod-search 2.0.x for a tenant,  add the following cluster-level permissions to the Opensearch role used by mod-search:   
