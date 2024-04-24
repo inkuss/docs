@@ -19,7 +19,7 @@ This is a documentation for an **upgrade** of your FOLIO system.
 
 * If you are deploying FOLIO for the first time, or if you want to start with a fresh installation for whatever reasons, see [how to do a **fresh installation**]({{< ref "singleserverfreshinstall.md" >}}) of a single server deployment.
 
-* This documentation shows how to upgrade to a **platform-complete** distribution of Orchid.
+* This documentation shows how to upgrade to a **platform-complete** distribution of Poppy.
 
 * Throughout this documentation, the sample tenant "diku" will be used. Replace with the name of your tenant, as appropriate.
 
@@ -181,13 +181,21 @@ Make sure SYSTEM_USER_PASSWORD in /\_/env is the actual password for these syste
 
 Log in as these users with this password. If that doesn't work, change the password of these system users to the value of the system variable SYSTEM_USER_PASSWORD.
 
-#### i. Set environment varianle env (only required in a multi-tenant environment)
+#### i. Set new global environment variables
+Set the ENV var -- only required in a multi-tenant environment
 If you are in a multi-tenant environment, set environment variable ENV to ENV = poppy . In a single tenant environment, you don't need to set it . It has the default value ENV = folio.
 ```
 curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"ENV\",\"value\":\"poppy\"}" http://localhost:9130/_/env
 ```
+
+Set INNREACH_TENANTS - otherwise mod-inn-reach will not start for your tenant:
+```
+curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"INNREACH_TENANTS\",\"value\":\"diku\"}" http://localhost:9130/_/env
+```
+If you have multiple tenant, separate their names by "|" in the INNREACH_TENANTS variable's value.
+
+Make sure KAFKA_HOST and KAFKA_PORT are set in /env, otherwise mod-user will fail startup.
   
-From Orchid release notes, do these steps:
 #### ii. Incompatible Hazelcast version in mod-remote-storage
 During the upgrade, the Orchid and Poppy versions of mod-remote-storage will run in parallel. This will only work if they are on different Hazelcast clusters. Set the Hazelcast cluster name for the Poppy version to "poppy":
 ```
@@ -216,7 +224,19 @@ Java: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx1440m
 Amazon Container: cpu - 1024, memory - 1512, memoryReservation - 1360
 ```
 
-#### iv. Set jwt.signing.key for mod-authtoken
+#### iv. S3 storage compatible environment variables
+Some modules make use of an S3 storage or compatible (AWS-S3 or minion server) persistent storage. 
+mod-data-export-worker has been using it since some releases ago.
+Module that now also make use of it are:
+  mod-bulk-operations,
+  mod-data-import - if you want to use the splitting functionality for large MARC21 import files,
+  mod-oai-pmh - if you want to store error logs,
+  mod-lists - in order to support exporting list contents.
+Set at least those env vars in these modules (edit the launch descriptor):
+       S3_URL, S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY.
+Confer the documentation of these modules on github - these variables might be called AWS_URL etc. for some of the modules.
+
+#### v. Set jwt.signing.key for mod-authtoken
 In the launch descriptor of mod-authtoken-2.14.1, set jwt.signing.key in the JAVA_OPTION to the same value as you have set it in the Orchid version of mod-authtoken(2.13.0) :
 ```
       "name" : "JAVA_OPTIONS",
@@ -233,7 +253,7 @@ Also activate and configure expiring tokens for your tenants in the same launch 
       "value" : "tenantId:diku,accessToken:600,refreshToken:604800;tenantId:mytenant,accessToken:3600,refreshToken:604800"
 ```
 
-#### v. Set env vars for mod-search-3.0.8
+#### vi. Set env vars for mod-search-3.0.8
 If you have set ENV = poppy, set KAFKA_EVENTS_CONSUMER_PATTERN for mod-search, using the value of ENV as a part of its value:
     KAFKA_EVENTS_CONSUMER_PATTERN = (poppy\.)(.*\.)inventory\.(instance|holdings-record|item|bound-with)
     
@@ -241,8 +261,29 @@ If you have set ENV = folio, set  KAFKA_EVENTS_CONSUMER_PATTERN = (folio\.)(.*\.
 
 Set SEARCH_BY_ALL_FIELDS_ENABLED to "true" if you want to activate the search option "all" (search in all fields). By default, SEARCH_BY_ALL_FIELDS_ENABLED is set to "false".
 
-  HIER WEITER
-  weiter bei Poppy Release Notes, "Changes & Required Actions", "Inventory, SRS, Data import"
+#### vii. Splitting functionality for data import
+If you expect to have to process large MARC 21 import file, enable the splitting functionality of mod-data-import. Set S3-compatible environment variables of mod-data-import. Read the [Release Note details](https://folio-org.atlassian.net/wiki/spaces/FOLIOtips/pages/5674882/Detailed+Release+Notes+for+Data+Import+Splitting+Feature#DetailedReleaseNotesforDataImportSplittingFeature-Suggestedvalues).
+
+#### viii. Read/Write Split in mod-fqm-manager
+It is highly recommended to enable read/write split in mod-fqm-manager, in order to prevent the module from impacting the performance of other FOLIO modules.
+
+#### ix. mod-source-record-manager
+Set srs.record.matching.fallback-query.enable = true to prepare for the running of a post-upgrade script.
+
+#### x. mod-pubsub
+Set SYSTEM_USER_NAME in mod-pubsub. Prevous default was "pub-sub", but the fallback has been removed. Set it explicitely in mod-pubsub. Also set SYSTEM_USER_PASSWORD or use the global value in /env (if a global value has been set, this overrides the values in the launch descriptor).
+
+#### xi. mod-circulation
+Integration with Kafka was added to mod-circulation. Make sure that environment variables KAFKA_HOST and KAFKA_PORT are set before upgrading the module.
+
+### II.v) Run Pre-Upgrade Scripts
+#### i. Call number migration
+Run Step 1 of [Call Number Migration](https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1404800/Call-numbers+migration).
+
+#### ii. Authorities migration
+Run migration script for existing authorities (if you have any) [Authorities migration](https://folio-org.atlassian.net/wiki/display/FOLIJET/Authorities+migration). Authorities were moved from mod-inventory-storage to mod-entities-links. This migration is required for moving existing records from one module schema to another.
+
+  HIER WEITER; Abgleich mit upgrade-Nolana-to-Orchid_Installationsnotizen.txt (auf folio-hbz5 / folio-hbz3)
 
 ## III. Create new Frontend : Stripes
 
@@ -289,6 +330,7 @@ Use loadReference%3Dfalse if you have changed reference data to local values in 
 Use loadReference%3Dtrue if your reference data is in the initial state.
 If you do loadReference%3Dfalse, new reference data will not be loaded and you will need to load them manually after the upgrade process.
 If you do loadReference%3Dtrue, your local changes to reference data might become overwritten and you will need to correct them later.
+Achtung ! According to Poppy Release Notes, mod-entities-links is required to deploy with tenant parameter: loadReference=true . mod-entities-links aus der Liste raus nehmen und einzeln deployen!
 ```
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @/usr/folio/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dfalse
 ```
@@ -416,34 +458,28 @@ Congratulations, your Orchid backend is complete and cleaned-up now ! Now, you h
 
 
 ## VI. Post Upgrade
-From Orchid release notes:
-### i. Additional cluster-level permissions are required in Opensearch 
-Before initializing mod-search 2.0.x for a tenant,  add the following cluster-level permissions to the Opensearch role used by mod-search:   
-```
-cluster:admin/script/get
-cluster:admin/script/put
-cluster:admin/script/delete
-```
-This change may also impact Elasticsearch as well (this is unveryfied, however).
-For an unsecured Elasticsearch installation, no action is required.
+From Poppy Release notes:
 
-### ii. **Breaking Change** : Instance data in mod-inventory-storage have to be migrated. 
+### VI.i) Long Running Migration Scripts
+#### 1. Scripts for Inventory, Source Record Storage and Data Import Cleanup
+The following scripts may be used for identifying and cleaning up records in FOLIO's Source Record Storage and Inventory. More technical details are available via the title hotlink for each script. [Scripts for Inventory, Source Record Storage and Data Import Cleanup](https://folio-org.atlassian.net/wiki/spaces/FOLIOtips/pages/5672820/Scripts+for+Inventory+Source+Record+Storage+and+Data+Import+Cleanup)
 
-To initialize migration use the endpoint POST /inventory-storage/migrations/jobs with body.
-First get a new Token:
-```
-  export TOKEN=$( curl -s -S -D - -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -H "Accept: application/json" -d '{ "tenant" : "diku", "username" : "diku_admin", "password" : "admin" }' http://localhost:9130/authn/login | grep -i "^x-okapi-token: " )
-  curl -w '\n' -D - -X POST -H "$TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "migrations" : [ "subjectSeriesMigration" ], "affectedEntities": [ "INSTANCE" ] }' http://localhost:9130/inventory-storage/migrations/jobs
-```
-Migrate any other tenants in the same way.
-To check the status of migration use the endpoint GET /inventory-storage/migrations/jobs/<id> where id - is the id from the POST response.
-Migration could be done after the upgrade.
-Migration could be sped up with scaling up mod-inventory-storage's replicas.
+#### 2. Call Number Migration
+Run Step 2 of [Call Number Migration](https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1404800/Call-numbers+migration).
 
-On a single server with a single instance of mod-inventory-storage, migration takes approx. 15 minutes for 100,000 instances.
+#### 3. OAI-PMH
+A new field "completeUpdatedDate" has been added to the instance schema.
+If you make use of the OAI-PMH API (mod-oai-pmh, edge-oai-pmh) execute scripts as documented in [Migration scripts for OAI-PMH](https://folio-org.atlassian.net/wiki/spaces/FOLIOtips/pages/5674971).
+Execution of the script takes approximately 5 hours for 8 millions instance records.
 
-### iii. Recreate OpenSearch or Elasticsearch index
-Sometimes we need to recreate OpenSearch or Elasticsearch index, for example when a breaking change has been introduced to index structure (mapping). We must re-index after migrating to Orchid. It can be fixed by running reindex request:
+#### 4. Populate marc_indexers for mod-source-record-storage 
+Run [Scripts to populate marc_indexers version](https://folio-org.atlassian.net/wiki/display/FOLIJET/Scripts+to+populate+marc_indexers+version).
+
+#### 5. consortia environments
+Some changes only apply to consortia environments. Cf. the Release Notes (Required Actions) for details.
+
+#### 6. Recreate OpenSearch or Elasticsearch index
+Sometimes we need to recreate OpenSearch or Elasticsearch index, for example when a breaking change has been introduced to index structure (mapping). We must re-index after migrating to Poppy. It can be fixed by running reindex request:
 
   Assure the following permission has been assigned to user diku_admin:
     search.index.inventory.reindex.post (Search - starts inventory reindex operation)
@@ -459,26 +495,33 @@ There is no end-to-end monitoring implemented yet, however it is possible to mon
 ```
     curl -w '\n' -D - -X GET -H "$TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/{id}
 ```
-Repeat the re-indexing process for other tenants that you might host on your server and have also migrated to Orchid.
+Repeat the re-indexing process for other tenants that you might host on your server and have also migrated to Poppy.
 
-### iv. New database indexes for MARC fields
-New indexes to the DB were added for the "010" and "035" MARC fields, to improve stability and decrease timeouts.
-Indexes are added automatically during the upgrade process. Default DB configuration implies automatic analyzing of tables. In case you should have disabled automatic analyzing, execute the ANALYZE command on mod-source-record-storage schemas.
 
-### v. Default MARC-Instance mapping updated to change how the Relator term is populated on an instance record
-See [Update of mapping to change how Relator term is populated on instance record R1 2023 Orchid release](https://wiki.folio.org/display/FOLIJET/Update+of+mapping+to+change+how+Relator+term+is+populated+on+instance+record+R1+2023+Orchid+release) for additional details.
-Update: 21 April: an [update script](https://wiki.folio.org/display/FOLIJET/Orchid+MARC-to-Instance+mapping+rules+update+instructions) has been provided. 
-**Mandatory change.**
-Note that any revised mappings will only apply to Instances created or updated via MARC Bibs **after** the map is updated. To refresh existing Instances against the current SRS MARC Bibs and current map, the library may consider running [Script 3 described here: Scripts for Inventory, Source Record Storage, and Data Import Cleanup](https://wiki.folio.org/display/FOLIOtips/Scripts+for+Inventory%2C+Source+Record+Storage%2C+and+Data+Import+Cleanup).
+### VI.ii) Change Settings
+#### 1. OAI-PMH error logs storage Settings
+If you have enabled OAI-PMH error logs storing, use the PUT /configurations/entries/ endpoint to configure e.g. the duration of how long error logs are being stored. Read the details here [Backend Module OAI-PMH](https://github.com/folio-org/mod-oai-pmh#configuration)
 
-### vi. Default MARC-Instance mapping rule added for MARC 720 field
-Follow the description in the [Release Notes](https://wiki.folio.org/display/REL/Orchid+%28R1+2023%29+Release+Notes).
+#### 2. Dashboard migration
+After updating to mod-service-interaction 3.0.3 (included in Poppy CSP #1):
+With a user with the “Dashboard: Dashboard administrator” permission allocated
+```
+GET <okapi base URL>/servint/admin/ensureDisplayData
 
-### vii. "marc_indexers" table data in mod-source-record-storage have to be migrated.
-Follow the description in the [Release Notes](https://wiki.folio.org/display/REL/Orchid+%28R1+2023%29+Release+Notes).
+Expected response:
 
-Add new permissions as described in the [Release Notes](https://wiki.folio.org/display/REL/Orchid+%28R1+2023%29+Release+Notes) **Permission Updates**.
+200 OK
+{
+    "status": "OK"
+}
+```
 
+#### 3. Inventory and Orders configuration
+All libraries must ensure they have Invalid ISBN resource identifier type in inventory configurations. If not they may have issues with editing order lines.
+Navigate to inventory settings and select resource identifier types. Ensure there is a type with the nameInvalid ISBN.
+
+### VI.iii) Update permissions
+Update permissions as described in the [Permissions Updates](https://folio-org.atlassian.net/wiki/spaces/REL/pages/16482959/Permissions+Updates).
 
 
 Congratulation, your system is ready!
