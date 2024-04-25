@@ -68,7 +68,7 @@ Fetch the new release version of platform-complete, change into that directory:
 cd platform-complete
 git fetch
 ```
-There is a branch R2-2023-csp-3 (released on April 11, 2024). We will deploy this version.
+There is a branch R2-2023-csp-4 (released on April 24, 2024). We will deploy this version.
 Check out this Branch.
 Stash local changes. This should only pertain to stripes.config.js .
 Discard any changes which you might have made on the install-jsons:
@@ -82,7 +82,7 @@ git restore package.json
 git stash save
 git checkout master
 git pull
-git checkout R2-2023-csp-3
+git checkout R2-2023-csp-4
 git stash pop
 ```
 
@@ -276,14 +276,20 @@ Set SYSTEM_USER_NAME in mod-pubsub. Prevous default was "pub-sub", but the fallb
 #### xi. mod-circulation
 Integration with Kafka was added to mod-circulation. Make sure that environment variables KAFKA_HOST and KAFKA_PORT are set before upgrading the module.
 
+#### xii. mod-agreements
+Increase "Memory" in the Launch Descriptor of mod-agreements to 8 GB, if you want to connect FOLIO to GOKB.
+```
+  "dockerArgs" : {
+      "HostConfig" : {
+        "Memory" : 8589934592,
+```
+
 ### II.v) Run Pre-Upgrade Scripts
 #### i. Call number migration
 Run Step 1 of [Call Number Migration](https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1404800/Call-numbers+migration).
 
 #### ii. Authorities migration
 Run migration script for existing authorities (if you have any) [Authorities migration](https://folio-org.atlassian.net/wiki/display/FOLIJET/Authorities+migration). Authorities were moved from mod-inventory-storage to mod-entities-links. This migration is required for moving existing records from one module schema to another.
-
-  HIER WEITER; Abgleich mit upgrade-Nolana-to-Orchid_Installationsnotizen.txt (auf folio-hbz5 / folio-hbz3)
 
 ## III. Create new Frontend : Stripes
 
@@ -469,7 +475,7 @@ Run Step 2 of [Call Number Migration](https://folio-org.atlassian.net/wiki/space
 
 #### 3. OAI-PMH
 A new field "completeUpdatedDate" has been added to the instance schema.
-If you make use of the OAI-PMH API (mod-oai-pmh, edge-oai-pmh) execute scripts as documented in [Migration scripts for OAI-PMH](https://folio-org.atlassian.net/wiki/spaces/FOLIOtips/pages/5674971).
+If you make use of the OAI-PMH API (mod-oai-pmh, edge-oai-pmh) execute scripts as documented in [Migration scripts for OAI-PMH](https://folio-org.atlassian.net/wiki/display/FOLIOtips/Migration+scripts+for+OAI-PMH).
 Execution of the script takes approximately 5 hours for 8 millions instance records.
 
 #### 4. Populate marc_indexers for mod-source-record-storage 
@@ -477,6 +483,7 @@ Run [Scripts to populate marc_indexers version](https://folio-org.atlassian.net/
 
 #### 5. consortia environments
 Some changes only apply to consortia environments. Cf. the Release Notes (Required Actions) for details.
+See [Adding a new member tenant to a consortium](https://folio-org.atlassian.net/wiki/display/FOLIJET/Adding+a+new+member+tenant+to+consortium.+mod-entities-links+scope).
 
 #### 6. Recreate OpenSearch or Elasticsearch index
 Sometimes we need to recreate OpenSearch or Elasticsearch index, for example when a breaking change has been introduced to index structure (mapping). We must re-index after migrating to Poppy. It can be fixed by running reindex request:
@@ -522,6 +529,15 @@ Navigate to inventory settings and select resource identifier types. Ensure ther
 
 ### VI.iii) Update permissions
 Update permissions as described in the [Permissions Updates](https://folio-org.atlassian.net/wiki/spaces/REL/pages/16482959/Permissions+Updates).
+
+### VI.iv) Manual Tests
+- Login to the frontend, user=diku_admin, passwd=admin
+- Delete browser cache (this is important, otherwise you will see the old frontend modules)
+- Go to Settings page 
+    check against "incompatible interface versions". There should be none.
+    check if "Poppy CSP-4" is being displayed on the settings page
+- check if circulation log can be downloaded (this checks if mod-data-export-worker works)
+- check if emails are being sent (do a checkout for a test user)
 
 
 Congratulation, your system is ready!
