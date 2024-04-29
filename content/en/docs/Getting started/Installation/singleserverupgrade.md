@@ -100,7 +100,7 @@ Build Okapi from source
 ```
   cd /usr/folio/okapi
   git fetch
-  git checkout v5.2.1
+  git checkout v5.1.2
   mvn clean install -DskipTests=true
     ...
     [INFO] BUILD SUCCESS
@@ -133,11 +133,11 @@ Retrieve the list of modules which are now being enabled for your tenant (just f
 curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules
 ...
 }, {
-  "id" : "okapi-5.2.1"
+  "id" : "okapi-5.1.2"
 } ]
 ```
 
-If you are starting with a complete platform of Orchid, you will see 9 Edge modules, 59 Frontend modules (folio_\*), 65 Backend modules (mod-\*) and the Poppy version of Okapi (5.2.1).
+If you are starting with a complete platform of Orchid, you will see 9 Edge modules, 59 Frontend modules (folio_\*), 65 Backend modules (mod-\*) and the Poppy version of Okapi (5.1.2).
 
 ### II.iii) Pull module descriptors from the central registry
 
@@ -150,11 +150,11 @@ curl -w '\n' -D - -X POST -H "Content-type: application/json" \
 Okapi log should show something like
 
 ```
- INFO  ProxyContent         759951/proxy REQ 127.0.0.1:58954 supertenant POST /_/proxy/pull/modules okapi-5.2.1
+ INFO  ProxyContent         759951/proxy REQ 127.0.0.1:58954 supertenant POST /_/proxy/pull/modules okapi-5.1.2
  INFO  PullManager          Remote registry at https://folio-registry.dev.folio.org is version 5.0.1
  INFO  PullManager          pull smart
  INFO  PullManager          pull: 1440 MDs to insert
- INFO  ProxyContent         759951/proxy RES 200 32114437us okapi-5.2.1 /_/proxy/pull/modules
+ INFO  ProxyContent         759951/proxy RES 200 32114437us okapi-5.1.2 /_/proxy/pull/modules
 ```
 
 
@@ -227,7 +227,7 @@ Amazon Container: cpu - 1024, memory - 1512, memoryReservation - 1360
 #### iv. S3 storage compatible environment variables
 Some modules make use of an S3 storage or compatible (AWS-S3 or minion server) persistent storage. 
 mod-data-export-worker has been using it since some releases ago.
-Module that now also make use of it are:
+Modules that now also make use of it are:
   mod-bulk-operations,
   mod-data-import - if you want to use the splitting functionality for large MARC21 import files,
   mod-oai-pmh - if you want to store error logs,
@@ -264,19 +264,16 @@ Set SEARCH_BY_ALL_FIELDS_ENABLED to "true" if you want to activate the search op
 #### vii. Splitting functionality for data import
 If you expect to have to process large MARC 21 import file, enable the splitting functionality of mod-data-import. Set S3-compatible environment variables of mod-data-import. Read the [Release Note details](https://folio-org.atlassian.net/wiki/spaces/FOLIOtips/pages/5674882/Detailed+Release+Notes+for+Data+Import+Splitting+Feature#DetailedReleaseNotesforDataImportSplittingFeature-Suggestedvalues).
 
-#### viii. Read/Write Split in mod-fqm-manager
-It is highly recommended to enable read/write split in mod-fqm-manager, in order to prevent the module from impacting the performance of other FOLIO modules.
-
-#### ix. mod-source-record-manager
+#### viii. mod-source-record-manager
 Set srs.record.matching.fallback-query.enable = true to prepare for the running of a post-upgrade script.
 
-#### x. mod-pubsub
-Set SYSTEM_USER_NAME in mod-pubsub. Prevous default was "pub-sub", but the fallback has been removed. Set it explicitely in mod-pubsub. Also set SYSTEM_USER_PASSWORD or use the global value in /env (if a global value has been set, this overrides the values in the launch descriptor).
+#### ix. mod-pubsub
+Set SYSTEM_USER_NAME in mod-pubsub. Prevous default was "pub-sub", but that fallback has been removed. Set it explicitely in mod-pubsub. Also set SYSTEM_USER_PASSWORD or use the global value in /env (if a global value has been set, this overrides the values in the launch descriptor).
 
-#### xi. mod-circulation
+#### x. mod-circulation
 Integration with Kafka was added to mod-circulation. Make sure that environment variables KAFKA_HOST and KAFKA_PORT are set before upgrading the module.
 
-#### xii. mod-agreements
+#### xi. mod-agreements
 Increase "Memory" in the Launch Descriptor of mod-agreements to 8 GB, if you want to connect FOLIO to GOKB.
 ```
   "dockerArgs" : {
@@ -284,6 +281,7 @@ Increase "Memory" in the Launch Descriptor of mod-agreements to 8 GB, if you wan
         "Memory" : 8589934592,
 ```
 
+HIER WEITER
 ### II.v) Run Pre-Upgrade Scripts
 #### i. Call number migration
 Run Step 1 of [Call Number Migration](https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1404800/Call-numbers+migration).
@@ -329,16 +327,17 @@ Users should stop working with the system now because after the new backend has 
 Deploy all backend modules of the new release with a single post to okapi's install endpoint. 
 This will deploy and enable all new modules. Start with a simulation run:
 ```
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @/usr/folio/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?simulate=true\&preRelease=false
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?simulate=true\&preRelease=false
 ```
 Then try to run with "deploy=true" like this.
 Use loadReference%3Dfalse if you have changed reference data to local values in your installation.
 Use loadReference%3Dtrue if your reference data is in the initial state.
 If you do loadReference%3Dfalse, new reference data will not be loaded and you will need to load them manually after the upgrade process.
 If you do loadReference%3Dtrue, your local changes to reference data might become overwritten and you will need to correct them later.
-Achtung ! According to Poppy Release Notes, mod-entities-links is required to deploy with tenant parameter: loadReference=true . mod-entities-links aus der Liste raus nehmen und einzeln deployen!
+
+Attention ! According to Poppy Release Notes, mod-entities-links is required to deploy with tenant parameter: loadReference=true . Take mod-entities-links out of install.json and deploy and enable it separately with loadReference=true. 
 ```
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @/usr/folio/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dfalse
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dfalse
 ```
 This call fails because frontend modules can not be deployed (we do this call anyway). 
 You will get a message "HTTP 400 - Module folio_developer-7.0.0 has no launchDescriptor".
@@ -349,42 +348,42 @@ Don't continue before all new modules have been deployed. Check by executing
 ```
 docker ps | grep mod- | wc
 ```
-This number should go up to 126 before you continue.
+This number should go up to 132 (65 backend modules from Orchid plus 67 from Poppy release) before you continue.
 
 We finish up by enabeling all modules (backend & frontend) with a single call without deploying any. We don't load reference data because we are doing a system upgrade (reference data have been loaded before):
 ```
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @/usr/folio/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dfalse
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/folio/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dfalse
 ```
 Repeat this step for any other tenants (who have enabled platform-complete) on your system.
 
 If that fails, remedy the error cause and try again until the post succeeds. 
 We will take care of old modules that are not needed anymore but are still running (deployed) in the "Clean up" section.
 
-There should now be 126 modules deployed on your single server, try
+There should now be 132 modules deployed on your single server, try
 ```
   docker ps | grep "mod-" | wc
 ```
-62 of those modules belong to the Nolana release, 65 belong to the Orchid release.
-1 module appears with the same version number in both releases, it has not been deployed twice ( mod-template-engine:1.18.0 ).
+65 of those modules belong to the Orchid release, 67 belong to the Poppy release.
+Some Modules might have deployed with the same version number twice, namely if they belong to both releases.
 
-Modules enabled for your tenant are now those of the Orchid release:
+Modules enabled for your tenant are now those of the Poppy release:
 ```
 curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules | grep id | wc
-  134
+  141
 ```
 
 This number is the sum of the following:
 
- Orchid release:
- - 59 Frontend modules
- -  9 Edge modules
- - 65 Backend modules
+ Poppy release:
+ - 62 Frontend modules
+ - 11 Edge modules
+ - 67 Backend modules
  -  1 Okapi module (5.0.1)
 
-These are all R1-2023 (Orchid) modules.
+These are all R2-2023 (Poppy) modules.
 
 
-## IV. Start the new Frontend
+## V. Start the new Frontend
 Stop the old Stripes container: 
 systemctl stop stripes
 ;docker stop <container id of your old stripes container which is still running>
@@ -394,17 +393,16 @@ Start the new stripes container:
 ;Redirect port 80 from the outside to port 80 of the docker container:
   
 ```
-  #cd ~/platform-complete
+  cd ~/platform-complete
   sudo su
-  #nohup docker run -d -p 80:80 stripes &
-  systemctl start stripes
+  nohup docker run -d -p 80:80 --name stripes stripes &
 ```
   
 Log in to your frontend: E.g., go to http://<YOUR_HOST_NAME>/ in your browser. 
 
-  - Can you see the Orchid modules in Settings - Installation details ?
+  - Can you see the Poppy modules in Settings - Installation details ?
 
-  - Do you see the right okapi version, 5.0.1-1 ? 
+  - Do you see the right Okapi version, 5.1.2 ? 
 
   - Does everything look good ?
 
@@ -414,7 +412,7 @@ It is now possible to access the system via the UI, again.
 However, changes in permission sets and long-running migration jobs still need to be carried out before the system can be used productively.
 
 
-## V. Cleanup
+## VI. Cleanup
   
 Clean up. 
 Clean up your docker environment: Remove all stopped containers, all networks not used by at least one container, all dangling images and all dangling build cash:
@@ -423,8 +421,8 @@ Clean up your docker environment: Remove all stopped containers, all networks no
 ```
 This command might run for some minutes.
 
-Undeploy all unused containers: Delete all modules from Okapi's discovery which are not part of the Orchid release.
-These are 61 modules of the Nolana release -- all but mod-template-engine:1.18.0 (this one is also part of Orchid).
+Undeploy all unused containers: Delete all modules from Okapi's discovery which are not part of the Poppy release.
+These are .. modules of the Orchid release -- all but the ones which are also part of Poppy.
 
 Undeploy old module versions like this:
 ```
@@ -435,23 +433,23 @@ curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-z3950-
 ```
 
 ### Result
-  for Orchid CSP#5
-  65 backend modules, "mod-\*" are contained in the list install.json. 
-  Those 65 backend modules are now enabled for your tenant(s). 
-  65 containers for those backend modules are running in docker on your system.
+  for Poppy CSP#4
+  67 backend modules, "mod-\*" are contained in the list install.json. 
+  Those 67 backend modules are now enabled for your tenant(s). 
+  67 containers for those backend modules are running in docker on your system.
 
 Now, finally once again get a list of the deployed backend modules:
   
   ```
   curl -w '\n' -D - http://localhost:9130/_/discovery/modules | grep srvcId | grep mod- | wc
- 65
+ 67
   ```
   
 Compare this with the number of your running docker containers:
   
   ```
   docker ps | grep "mod-" | wc
-    65
+    67
   ```
 
 Perform a health check
@@ -460,13 +458,13 @@ Perform a health check
   ```
 Is everything OK ?
   
-Congratulations, your Orchid backend is complete and cleaned-up now ! Now, you have to set up a new Stripes instance for the frontend of the tenant.
+Congratulations, your Poppy system is complete and cleaned-up now !
 
 
-## VI. Post Upgrade
+## VII. Post Upgrade
 From Poppy Release notes:
 
-### VI.i) Long Running Migration Scripts
+### VII.i) Long Running Migration Scripts
 #### 1. Scripts for Inventory, Source Record Storage and Data Import Cleanup
 The following scripts may be used for identifying and cleaning up records in FOLIO's Source Record Storage and Inventory. More technical details are available via the title hotlink for each script. [Scripts for Inventory, Source Record Storage and Data Import Cleanup](https://folio-org.atlassian.net/wiki/spaces/FOLIOtips/pages/5672820/Scripts+for+Inventory+Source+Record+Storage+and+Data+Import+Cleanup)
 
@@ -505,7 +503,7 @@ There is no end-to-end monitoring implemented yet, however it is possible to mon
 Repeat the re-indexing process for other tenants that you might host on your server and have also migrated to Poppy.
 
 
-### VI.ii) Change Settings
+### VII.ii) Change Settings
 #### 1. OAI-PMH error logs storage Settings
 If you have enabled OAI-PMH error logs storing, use the PUT /configurations/entries/ endpoint to configure e.g. the duration of how long error logs are being stored. Read the details here [Backend Module OAI-PMH](https://github.com/folio-org/mod-oai-pmh#configuration)
 
@@ -527,10 +525,10 @@ Expected response:
 All libraries must ensure they have Invalid ISBN resource identifier type in inventory configurations. If not they may have issues with editing order lines.
 Navigate to inventory settings and select resource identifier types. Ensure there is a type with the nameInvalid ISBN.
 
-### VI.iii) Update permissions
+### VII.iii) Update permissions
 Update permissions as described in the [Permissions Updates](https://folio-org.atlassian.net/wiki/spaces/REL/pages/16482959/Permissions+Updates).
 
-### VI.iv) Manual Tests
+### VII.iv) Manual Tests
 - Login to the frontend, user=diku_admin, passwd=admin
 - Delete browser cache (this is important, otherwise you will see the old frontend modules)
 - Go to Settings page 
