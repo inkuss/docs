@@ -281,7 +281,6 @@ Increase "Memory" in the Launch Descriptor of mod-agreements to 8 GB, if you wan
         "Memory" : 8589934592,
 ```
 
-HIER WEITER
 ### II.v) Run Pre-Upgrade Scripts
 #### i. Call number migration
 Run Step 1 of [Call Number Migration](https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1404800/Call-numbers+migration).
@@ -320,6 +319,7 @@ Successfully tagged stripes:latest
 
 This will run for approximately 10 minutes. 
 
+HIER WEITER
 ## IV. Deploy a new FOLIO backend and enable all modules of the new platform (backend & frontend)
 Now do a snapshot of your system, so you will be able to replay the current status in case the upgrade fails.
 Users should stop working with the system now because after the new backend has been deployed, the front end will be incompatible to the backend and will need to be redeployed, too.
