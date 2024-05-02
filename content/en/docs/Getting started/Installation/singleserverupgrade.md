@@ -195,6 +195,8 @@ curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"IN
 If you have multiple tenant, separate their names by "|" in the INNREACH_TENANTS variable's value.
 
 Make sure KAFKA_HOST and KAFKA_PORT are set in /env, otherwise mod-user will fail startup.
+
+Set DB_CONNECTION_TIMEOUT to at least 250, otherwise mod-entities-links will fail startup.
   
 #### ii. Incompatible Hazelcast version in mod-remote-storage
 During the upgrade, the Orchid and Poppy versions of mod-remote-storage will run in parallel. This will only work if they are on different Hazelcast clusters. Set the Hazelcast cluster name for the Poppy version to "poppy":
@@ -243,11 +245,12 @@ In the launch descriptor of mod-authtoken-2.14.1, set jwt.signing.key in the JAV
       "value" : "-XX:MaxRAMPercentage=66.0 -Dcache.permissions=true -Djwt.signing.key=folio-demo"
 ```
 
-Also activate and configure expiring tokens for your tenants in the same launch descriptor (see the README of [mod-authtoken](https://github.com/folio-org/mod-authtoken))
+Poppy doesn't support expiring tokens in the frontend, yet. Declare your tenants as legacy tenants or don't set LEGACY_TOKEN_TENANTS and TOKEN_EXPIRATION_SECONDS in mod-authtoken-2.14.1 at all:
+(for details cf. the README of [mod-authtoken](https://github.com/folio-org/mod-authtoken))
 ```
  }, {
       "name" : "LEGACY_TOKEN_TENANTS", 
-      "value" : ""
+      "value" : "*"
     }, {
       "name" : "TOKEN_EXPIRATION_SECONDS",
       "value" : "tenantId:diku,accessToken:600,refreshToken:604800;tenantId:mytenant,accessToken:3600,refreshToken:604800"
@@ -318,8 +321,8 @@ Successfully tagged stripes:latest
 ```
 
 This will run for approximately 10 minutes. 
+Build more Stripes docker containers for any other tenants that you might host.
 
-HIER WEITER
 ## IV. Deploy a new FOLIO backend and enable all modules of the new platform (backend & frontend)
 Now do a snapshot of your system, so you will be able to replay the current status in case the upgrade fails.
 Users should stop working with the system now because after the new backend has been deployed, the front end will be incompatible to the backend and will need to be redeployed, too.
@@ -330,41 +333,43 @@ This will deploy and enable all new modules. Start with a simulation run:
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?simulate=true\&preRelease=false
 ```
 Then try to run with "deploy=true" like this.
-Use loadReference%3Dfalse if you have changed reference data to local values in your installation.
-Use loadReference%3Dtrue if your reference data is in the initial state.
-If you do loadReference%3Dfalse, new reference data will not be loaded and you will need to load them manually after the upgrade process.
-If you do loadReference%3Dtrue, your local changes to reference data might become overwritten and you will need to correct them later.
-
-Attention ! According to Poppy Release Notes, mod-entities-links is required to deploy with tenant parameter: loadReference=true . Take mod-entities-links out of install.json and deploy and enable it separately with loadReference=true. 
 ```
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dfalse
 ```
 This call fails because frontend modules can not be deployed (we do this call anyway). 
-You will get a message "HTTP 400 - Module folio_developer-7.0.0 has no launchDescriptor".
-But this call deploys all backend modules. 
+You will get a message "HTTP 400 - Module folio_developer-8.0.1 has no launchDescriptor".
+But this call deploys all backend modules. It did not enable any backend modules.
 
 You can follow the progress in deployment on the terminal screen and/or in /var/log/folio/okapi/okapi.log .
 Don't continue before all new modules have been deployed. Check by executing
 ```
 docker ps | grep mod- | wc
 ```
-This number should go up to 132 (65 backend modules from Orchid plus 67 from Poppy release) before you continue.
+This number should go up to 131 before you continue.
+This number comprises of 65 backend modules from Orchid plus 66 new backend module versions from the Poppy release.
+There is 1 module which is present in both releases in the same module version and it has not been deployed twice: mod-rtac:3.5.0.
 
-We finish up by enabeling all modules (backend & frontend) with a single call without deploying any. We don't load reference data because we are doing a system upgrade (reference data have been loaded before):
+We finish up by enabeling all modules (backend & frontend) with a single call without deploying any. 
+There is a choice of whether or not to load reference data (of the modules) upon enabeling them. There are pros and cons to either of the choice:
+- If we don't load reference data, reference data that have already been loaded and have been changed locally will be kept (which is good).
+  However, if we don't load reference data, any new reference data will not be loaded and we might need to load them manually after the upgrade process.
+- If we do load reference data, local changes to reference data might become overwritten and will need to be corrected manually, later.
+
+Because, according to Poppy Release Notes, mod-entities-links is required to deploy with tenant parameter 'loadReference=true', we here choose to load reference data for all modules . It is not possible to take mod-entities-links out of install.json and enable it separately, because then the system will run into interface incompatibility errors during enablement.
+
 ```
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/folio/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dfalse
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
 ```
 Repeat this step for any other tenants (who have enabled platform-complete) on your system.
 
 If that fails, remedy the error cause and try again until the post succeeds. 
 We will take care of old modules that are not needed anymore but are still running (deployed) in the "Clean up" section.
 
-There should now be 132 modules deployed on your single server, try
+There should now be 131 modules deployed on your single server, try
 ```
   docker ps | grep "mod-" | wc
 ```
-65 of those modules belong to the Orchid release, 67 belong to the Poppy release.
-Some Modules might have deployed with the same version number twice, namely if they belong to both releases.
+65 of those modules belong to the Orchid release, 66 belong to the Poppy release and one module belongs to both releases.
 
 Modules enabled for your tenant are now those of the Poppy release:
 ```
@@ -378,26 +383,26 @@ This number is the sum of the following:
  - 62 Frontend modules
  - 11 Edge modules
  - 67 Backend modules
- -  1 Okapi module (5.0.1)
+ -  1 Okapi module (5.1.2)
 
 These are all R2-2023 (Poppy) modules.
 
 
 ## V. Start the new Frontend
 Stop the old Stripes container: 
-systemctl stop stripes
-;docker stop <container id of your old stripes container which is still running>
-
-Start the new stripes container:
- 
-;Redirect port 80 from the outside to port 80 of the docker container:
-  
+```
+docker stop stripes
+docker rm stripes
+```
+Start the new stripes container.
+Redirect port 80 from the outside to port 80 of the docker container:
 ```
   cd ~/platform-complete
   sudo su
   nohup docker run -d -p 80:80 --name stripes stripes &
 ```
   
+Clear browser cache.
 Log in to your frontend: E.g., go to http://<YOUR_HOST_NAME>/ in your browser. 
 
   - Can you see the Poppy modules in Settings - Installation details ?
@@ -406,10 +411,10 @@ Log in to your frontend: E.g., go to http://<YOUR_HOST_NAME>/ in your browser.
 
   - Does everything look good ?
 
-If so, remove the old stripes container: docker rm \<container id of your old stripes container\> .
+Repeat these steps for the Stripes containers of any other tenants.
 
 It is now possible to access the system via the UI, again.
-However, changes in permission sets and long-running migration jobs still need to be carried out before the system can be used productively.
+However, changes in permission sets and long-running migration jobs still need to be carried out before the system can be used productively. You may not see the inventory data, yet.
 
 
 ## VI. Cleanup
@@ -422,14 +427,14 @@ Clean up your docker environment: Remove all stopped containers, all networks no
 This command might run for some minutes.
 
 Undeploy all unused containers: Delete all modules from Okapi's discovery which are not part of the Poppy release.
-These are .. modules of the Orchid release -- all but the ones which are also part of Poppy.
+These are 64 modules of the Orchid release -- all but mod-rtac-3.5.0.
 
 Undeploy old module versions like this:
 ```
-curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-agreements-5.4.4
-curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-audit-2.6.2
+curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-agreements-5.5.2
+curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-audit-2.7.0
 ...
-curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-z3950-3.1.0
+curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-z3950-3.3.2
 ```
 
 ### Result
@@ -461,6 +466,7 @@ Is everything OK ?
 Congratulations, your Poppy system is complete and cleaned-up now !
 
 
+HIER WEITER
 ## VII. Post Upgrade
 From Poppy Release notes:
 
@@ -536,6 +542,7 @@ Update permissions as described in the [Permissions Updates](https://folio-org.a
     check if "Poppy CSP-4" is being displayed on the settings page
 - check if circulation log can be downloaded (this checks if mod-data-export-worker works)
 - check if emails are being sent (do a checkout for a test user)
+- can you see the new Lists App ?
 
 
 Congratulation, your system is ready!
