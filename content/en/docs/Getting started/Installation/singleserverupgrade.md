@@ -466,7 +466,6 @@ Is everything OK ?
 Congratulations, your Poppy system is complete and cleaned-up now !
 
 
-HIER WEITER
 ## VII. Post Upgrade
 From Poppy Release notes:
 
@@ -475,12 +474,13 @@ From Poppy Release notes:
 The following scripts may be used for identifying and cleaning up records in FOLIO's Source Record Storage and Inventory. More technical details are available via the title hotlink for each script. [Scripts for Inventory, Source Record Storage and Data Import Cleanup](https://folio-org.atlassian.net/wiki/spaces/FOLIOtips/pages/5672820/Scripts+for+Inventory+Source+Record+Storage+and+Data+Import+Cleanup)
 
 #### 2. Call Number Migration
-Run Step 2 of [Call Number Migration](https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1404800/Call-numbers+migration).
+Run Step 2 of [Call Number Migration](https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1404800/Call-numbers+migration). There are two Options for Step 2. The first option will take the system down for a significant period of time (depending on the collection size). Option 2 still may take a significant amount of time but is much less disruptive. The annoying part of Option 2 ist that Step 3 needs to be executed 16 times.
 
 #### 3. OAI-PMH
 A new field "completeUpdatedDate" has been added to the instance schema.
 If you make use of the OAI-PMH API (mod-oai-pmh, edge-oai-pmh) execute scripts as documented in [Migration scripts for OAI-PMH](https://folio-org.atlassian.net/wiki/display/FOLIOtips/Migration+scripts+for+OAI-PMH).
 Execution of the script takes approximately 5 hours for 8 millions instance records.
+The Update Step needs to be executed 16 times for each tenant, can be executed concurrently.
 
 #### 4. Populate marc_indexers for mod-source-record-storage 
 Run [Scripts to populate marc_indexers version](https://folio-org.atlassian.net/wiki/display/FOLIJET/Scripts+to+populate+marc_indexers+version).
