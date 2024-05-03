@@ -515,7 +515,7 @@ If you have enabled OAI-PMH error logs storing, use the PUT /configurations/entr
 
 #### 2. Dashboard migration
 After updating to mod-service-interaction 3.0.3 (included in Poppy CSP #1):
-With a user with the “Dashboard: Dashboard administrator” permission allocated
+With a user with the “Dashboard: Dashboard administrator” permission allocated do -- use a Token and an x-okapi-tenant header as described above for the reindexing process :
 ```
 GET <okapi base URL>/servint/admin/ensureDisplayData
 
