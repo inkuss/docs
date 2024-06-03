@@ -68,7 +68,7 @@ Fetch the new release version of platform-complete, change into that directory:
 cd platform-complete
 git fetch
 ```
-There is a branch R2-2023-csp-4 (released on April 24, 2024). We will deploy this version.
+There is a branch R2-2023-csp-5 (released on May 13, 2024). We will deploy this version.
 Check out this Branch.
 Stash local changes. This should only pertain to stripes.config.js .
 Discard any changes which you might have made on the install-jsons:
@@ -82,7 +82,7 @@ git restore package.json
 git stash save
 git checkout master
 git pull
-git checkout R2-2023-csp-4
+git checkout R2-2023-csp-5
 git stash pop
 ```
 
@@ -111,6 +111,8 @@ If you have built Okapi from source for the first time you may need to adjust LI
   edit /etc/default/okapi
   LIB_DIR="/usr/folio/okapi/okapi-core/target"
 ```
+
+If you have built Okapi from source for the first time you need to create a file okapi.json in /etc/folio/okapi. This file complements the file okapi.conf in the same directory. Here is a such file with default values: [okapi.json]({{< ref "okapi.json" >}}).
 
 Restart Okapi
 ```
