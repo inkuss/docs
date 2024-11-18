@@ -19,7 +19,7 @@ This is a documentation for an **upgrade** of your FOLIO system.
 
 * If you are deploying FOLIO for the first time, or if you want to start with a fresh installation for whatever reasons, see [how to do a **fresh installation**]({{< ref "singleserverfreshinstall.md" >}}) of a single server deployment.
 
-* This documentation shows how to upgrade to a **platform-complete** distribution of Poppy.
+* This documentation shows how to upgrade to a **platform-complete** distribution of Quesnelia.
 
 * Throughout this documentation, the sample tenant "diku" will be used. Replace with the name of your tenant, as appropriate.
 
@@ -30,7 +30,7 @@ This is a documentation for an **upgrade** of your FOLIO system.
 | **System Type**                     | **Version referred to in this manual**     |
 |-------------------------------------|--------------------------------------------|
 | Operating system                    | Ubuntu 22.04.2 LTS 64-bits                 |
-| FOLIO system to migrate from        | Orchid CSP#5 (R1-2023-CSP-5)               |
+| FOLIO system to migrate from        | Poppy CSP#3 (R2-2023-CSP-3)               |
 
 
 **Hardware requirements**
@@ -43,6 +43,7 @@ This is a documentation for an **upgrade** of your FOLIO system.
 
 ## I. Before the Upgrade
 
+### I.i) Ubuntu Upgrade
 First do Ubuntu Updates & Upgrades
   
 ```
@@ -52,10 +53,15 @@ sudo reboot
 ```
 Check if all Services have been restarted after reboot: <em>Okapi, postgres, docker, the docker containers</em> (do: docker ps --all | more ) <em>, Stripes and nginx.</em>
 
-These are the [Poppy Release Notes](https://folio-org.atlassian.net/wiki/spaces/REL/pages/5210730/Poppy+R2+2023+Release+Notes)
+These are the official [Quesnelia Important Upgrade Considerations](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105775773/Quesnelia+R1+2024+Important+upgrade+considerations)
 Do these actions before the upgrade:
 
-From Poppy Release Notes:
+From Quesnelia Release Notes:
+
+### I.ii) Postgres Upgrade
+Migrate from PostgreSQL 12 to a more recent version by November 14, 2024.
+PostgreSQL 12 will reach end of life (no security fixes!) on November 14, 2024.
+FOLIO officially supports PostgreSQL 16 from Quesnelia on.
 
 ### More preparatory steps
 There might be more preparatory steps that you need to take into account for your installation. If you are unsure what other steps you might need to take, study carefully the Release Notes.  Do all actions in the column "Action required", as appropriate for your installation.
@@ -68,7 +74,7 @@ Fetch the new release version of platform-complete, change into that directory:
 cd platform-complete
 git fetch
 ```
-There is a branch R2-2023-csp-5 (released on May 13, 2024). We will deploy this version.
+There is a branch R1-2024-csp-6 (released on 2. Nov 2024). We will deploy this version.
 Check out this Branch.
 Stash local changes. This should only pertain to stripes.config.js .
 Discard any changes which you might have made on the install-jsons:
@@ -82,13 +88,13 @@ git restore package.json
 git stash save
 git checkout master
 git pull
-git checkout R2-2023-csp-5
+git checkout R1-2024-csp-6
 git stash pop
 ```
 
 ### II.ii) Upgrade Okapi
 Upgrade the Okapi version and restart Okapi.
-Read the Poppy Okapi version from install.json: **okapi-5.1.2**
+Read the Poppy Okapi version from install.json: **okapi-5.3.0**
 
 Set JAVA_HOME in .profile if you haven't already done so
 ```
@@ -100,7 +106,7 @@ Build Okapi from source
 ```
   cd /usr/folio/okapi
   git fetch
-  git checkout v5.1.2
+  git checkout v5.3.0
   mvn clean install -DskipTests=true
     ...
     [INFO] BUILD SUCCESS
@@ -135,11 +141,11 @@ Retrieve the list of modules which are now being enabled for your tenant (just f
 curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules
 ...
 }, {
-  "id" : "okapi-5.1.2"
+  "id" : "okapi-5.3.0"
 } ]
 ```
 
-If you are starting with a complete platform of Orchid, you will see 9 Edge modules, 59 Frontend modules (folio_\*), 65 Backend modules (mod-\*) and the Poppy version of Okapi (5.1.2).
+If you are starting with a complete platform of Orchid, you will see 9 Edge modules, 59 Frontend modules (folio_\*), 65 Backend modules (mod-\*) and the Quesnelia version of Okapi (5.3.0).
 
 ### II.iii) Pull module descriptors from the central registry
 
@@ -152,11 +158,11 @@ curl -w '\n' -D - -X POST -H "Content-type: application/json" \
 Okapi log should show something like
 
 ```
- INFO  ProxyContent         759951/proxy REQ 127.0.0.1:58954 supertenant POST /_/proxy/pull/modules okapi-5.1.2
- INFO  PullManager          Remote registry at https://folio-registry.dev.folio.org is version 5.0.1
+ INFO  ProxyContent         759951/proxy REQ 127.0.0.1:58954 supertenant POST /_/proxy/pull/modules okapi-5.3.0
+ INFO  PullManager          Remote registry at https://folio-registry.dev.folio.org is version 5.3.0
  INFO  PullManager          pull smart
  INFO  PullManager          pull: 1440 MDs to insert
- INFO  ProxyContent         759951/proxy RES 200 32114437us okapi-5.1.2 /_/proxy/pull/modules
+ INFO  ProxyContent         759951/proxy RES 200 32114437us okapi-5.3.0 /_/proxy/pull/modules
 ```
 
 
@@ -236,9 +242,13 @@ Modules that now also make use of it are:
   mod-data-import - if you want to use the splitting functionality for large MARC21 import files,
   mod-oai-pmh - if you want to store error logs,
   mod-lists - in order to support exporting list contents.
+  mod-entities-links
+  mod-data-export
 Set at least those env vars in these modules (edit the launch descriptor):
        S3_URL, S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY.
-Confer the documentation of these modules on github - these variables might be called AWS_URL etc. for some of the modules.
+Remove all AWS_* vars as they are replaced by S3_*. Set
+  EXPORT_IDS_BATCH = 1000
+  EXPORT_FILES_MAX_POOL_SIZE = 10
 
 #### v. Set jwt.signing.key for mod-authtoken
 In the launch descriptor of mod-authtoken-2.14.1, set jwt.signing.key in the JAVA_OPTION to the same value as you have set it in the Orchid version of mod-authtoken(2.13.0) :
@@ -258,25 +268,16 @@ Poppy doesn't support expiring tokens in the frontend, yet. Declare your tenants
       "value" : "tenantId:diku,accessToken:600,refreshToken:604800;tenantId:mytenant,accessToken:3600,refreshToken:604800"
 ```
 
-#### vi. Set env vars for mod-search-3.0.8
-If you have set ENV = poppy, set KAFKA_EVENTS_CONSUMER_PATTERN for mod-search, using the value of ENV as a part of its value:
-    KAFKA_EVENTS_CONSUMER_PATTERN = (poppy\.)(.*\.)inventory\.(instance|holdings-record|item|bound-with)
+#### vi. Set env vars for mod-search
+If you have set ENV = quesnelia, set KAFKA_EVENTS_CONSUMER_PATTERN for mod-search, using the value of ENV as a part of its value:
+    KAFKA_EVENTS_CONSUMER_PATTERN = (${ENV}\.)(.*\.)inventory\.(instance|holdings-record|item|bound-with)
     
 If you have set ENV = folio, set  KAFKA_EVENTS_CONSUMER_PATTERN = (folio\.)(.*\.)inventory\.(instance|holdings-record|item|bound-with)
 
 Set SEARCH_BY_ALL_FIELDS_ENABLED to "true" if you want to activate the search option "all" (search in all fields). By default, SEARCH_BY_ALL_FIELDS_ENABLED is set to "false".
 
-#### vii. Splitting functionality for data import
-If you expect to have to process large MARC 21 import file, enable the splitting functionality of mod-data-import. Set S3-compatible environment variables of mod-data-import. Read the [Release Note details](https://folio-org.atlassian.net/wiki/spaces/FOLIOtips/pages/5674882/Detailed+Release+Notes+for+Data+Import+Splitting+Feature#DetailedReleaseNotesforDataImportSplittingFeature-Suggestedvalues).
-
-#### viii. mod-source-record-manager
-Set srs.record.matching.fallback-query.enable = true to prepare for the running of a post-upgrade script.
-
 #### ix. mod-pubsub
 Set SYSTEM_USER_NAME in mod-pubsub. Prevous default was "pub-sub", but that fallback has been removed. Set it explicitely in mod-pubsub. Also set SYSTEM_USER_PASSWORD or use the global value in /env (if a global value has been set, this overrides the values in the launch descriptor).
-
-#### x. mod-circulation
-Integration with Kafka was added to mod-circulation. Make sure that environment variables KAFKA_HOST and KAFKA_PORT are set before upgrading the module.
 
 #### xi. mod-agreements
 Increase "Memory" in the Launch Descriptor of mod-agreements to 8 GB, if you want to connect FOLIO to GOKB.
@@ -287,11 +288,9 @@ Increase "Memory" in the Launch Descriptor of mod-agreements to 8 GB, if you wan
 ```
 
 ### II.v) Run Pre-Upgrade Scripts
-#### i. Call number migration
-Run Step 1 of [Call Number Migration](https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1404800/Call-numbers+migration).
-
-#### ii. Authorities migration
-Run migration script for existing authorities (if you have any) [Authorities migration](https://folio-org.atlassian.net/wiki/display/FOLIJET/Authorities+migration). Authorities were moved from mod-inventory-storage to mod-entities-links. This migration is required for moving existing records from one module schema to another.
+from Quesnelia Release Notes:
+Before or after the Upgrade:
+Token in the reset password link expires early. Ensure that mod-users-bl’s RESET_PASSWORD_LINK_EXPIRATION_TIME (default: 24 hours) does not exceed mod-authtoken’s token.expiration.seconds (default: 10 minutes)
 
 ## III. Create new Frontend : Stripes
 
@@ -357,7 +356,9 @@ There is a choice of whether or not to load reference data (of the modules) upon
   However, if we don't load reference data, any new reference data will not be loaded and we might need to load them manually after the upgrade process.
 - If we do load reference data, local changes to reference data might become overwritten and will need to be corrected manually, later.
 
-Because, according to Poppy Release Notes, mod-entities-links is required to deploy with tenant parameter 'loadReference=true', we here choose to load reference data for all modules . It is not possible to take mod-entities-links out of install.json and enable it separately, because then the system will run into interface incompatibility errors during enablement.
+We here choose to load reference data for all modules . If library has changed any reference data and migrates using loadReference = true: Make a backup before migration and restore afterwards. From Quesnelia Release Notes: "Migration from Poppy to Quesnelia resets reference data. 
+Other modules don’t touch existing reference data when migrating with parameter loadReference = true, but mod-circulation-storage does.
+Most notable reference data that gets reset to default: Circulation rules."
 
 ```
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
@@ -409,7 +410,7 @@ Log in to your frontend: E.g., go to http://<YOUR_HOST_NAME>/ in your browser.
 
   - Can you see the Poppy modules in Settings - Installation details ?
 
-  - Do you see the right Okapi version, 5.1.2 ? 
+  - Do you see the right Okapi version, 5.3.0 ? 
 
   - Does everything look good ?
 
@@ -440,7 +441,7 @@ curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-z3950-
 ```
 
 ### Result
-  for Poppy CSP#4
+  for Quesnelia CSP#6
   67 backend modules, "mod-\*" are contained in the list install.json. 
   Those 67 backend modules are now enabled for your tenant(s). 
   67 containers for those backend modules are running in docker on your system.
@@ -469,29 +470,17 @@ Congratulations, your Poppy system is complete and cleaned-up now !
 
 
 ## VII. Post Upgrade
-From Poppy Release notes:
 
-### VII.i) Long Running Migration Scripts
-#### 1. Scripts for Inventory, Source Record Storage and Data Import Cleanup
-The following scripts may be used for identifying and cleaning up records in FOLIO's Source Record Storage and Inventory. More technical details are available via the title hotlink for each script. [Scripts for Inventory, Source Record Storage and Data Import Cleanup](https://folio-org.atlassian.net/wiki/spaces/FOLIOtips/pages/5672820/Scripts+for+Inventory+Source+Record+Storage+and+Data+Import+Cleanup)
+### VII.i) From Quesnelia Release notes
+#### 1.) Update MARC-Instance Mapping (Optional)
+After upgrade follow the instructions to update the mapping rules. Change is optional.
+https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1407190/Script+to+update+mapping+rules+with+required+condition+for+specified+fields
 
-#### 2. Call Number Migration
-Run Step 2 of [Call Number Migration](https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1404800/Call-numbers+migration). There are two Options for Step 2. The first option will take the system down for a significant period of time (depending on the collection size). Option 2 still may take a significant amount of time but is much less disruptive. The annoying part of Option 2 ist that Step 3 needs to be executed 16 times.
+#### 2.) Data Import Job Profiles
+Run script to identify Job Profiles that need to be reviewed and corrected.
+https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/168788217
 
-#### 3. OAI-PMH
-A new field "completeUpdatedDate" has been added to the instance schema.
-If you make use of the OAI-PMH API (mod-oai-pmh, edge-oai-pmh) execute scripts as documented in [Migration scripts for OAI-PMH](https://folio-org.atlassian.net/wiki/display/FOLIOtips/Migration+scripts+for+OAI-PMH).
-Execution of the script takes approximately 5 hours for 8 millions instance records.
-The Update Step needs to be executed 16 times for each tenant, can be executed concurrently.
-
-#### 4. Populate marc_indexers for mod-source-record-storage 
-Run [Scripts to populate marc_indexers version](https://folio-org.atlassian.net/wiki/display/FOLIJET/Scripts+to+populate+marc_indexers+version).
-
-#### 5. consortia environments
-Some changes only apply to consortia environments. Cf. the Release Notes (Required Actions) for details.
-See [Adding a new member tenant to a consortium](https://folio-org.atlassian.net/wiki/display/FOLIJET/Adding+a+new+member+tenant+to+consortium.+mod-entities-links+scope).
-
-#### 6. Recreate OpenSearch or Elasticsearch index
+### VII.ii) Recreate OpenSearch or Elasticsearch index
 Sometimes we need to recreate OpenSearch or Elasticsearch index, for example when a breaking change has been introduced to index structure (mapping). We must re-index after migrating to Poppy. It can be fixed by running reindex request:
 
   Assure the following permission has been assigned to user diku_admin:
@@ -510,41 +499,17 @@ There is no end-to-end monitoring implemented yet, however it is possible to mon
 ```
 Repeat the re-indexing process for other tenants that you might host on your server and have also migrated to Poppy.
 
-
-### VII.ii) Change Settings
-#### 1. OAI-PMH error logs storage Settings
-If you have enabled OAI-PMH error logs storing, use the PUT /configurations/entries/ endpoint to configure e.g. the duration of how long error logs are being stored. Read the details here [Backend Module OAI-PMH](https://github.com/folio-org/mod-oai-pmh#configuration)
-
-#### 2. Dashboard migration
-After updating to mod-service-interaction 3.0.3 (included in Poppy CSP #1):
-With a user with the “Dashboard: Dashboard administrator” permission allocated do -- use a Token and an x-okapi-tenant header as described above for the reindexing process :
-```
-GET <okapi base URL>/servint/admin/ensureDisplayData
-
-Expected response:
-
-200 OK
-{
-    "status": "OK"
-}
-```
-
-#### 3. Inventory and Orders configuration
-All libraries must ensure they have Invalid ISBN resource identifier type in inventory configurations. If not they may have issues with editing order lines.
-Navigate to inventory settings and select resource identifier types. Ensure there is a type with the nameInvalid ISBN.
-
 ### VII.iii) Update permissions
-Update permissions as described in the [Permissions Updates](https://folio-org.atlassian.net/wiki/spaces/REL/pages/16482959/Permissions+Updates).
+Update permissions as described in the [Permissions Updates](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105775925/Quesnelia+R1+2024+Permissions+Updates).
 
 ### VII.iv) Manual Tests
 - Login to the frontend, user=diku_admin, passwd=admin
 - Delete browser cache (this is important, otherwise you will see the old frontend modules)
 - Go to Settings page 
     check against "incompatible interface versions". There should be none.
-    check if "Poppy CSP-4" is being displayed on the settings page
+    check if "Quesnelia CSP-6" is being displayed on the settings page
 - check if circulation log can be downloaded (this checks if mod-data-export-worker works)
 - check if emails are being sent (do a checkout for a test user)
-- can you see the new Lists App ?
 
 
 Congratulation, your system is ready!
