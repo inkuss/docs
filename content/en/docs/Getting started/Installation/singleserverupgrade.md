@@ -56,12 +56,92 @@ Check if all Services have been restarted after reboot: <em>Okapi, postgres, doc
 These are the official [Quesnelia Important Upgrade Considerations](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105775773/Quesnelia+R1+2024+Important+upgrade+considerations)
 Do these actions before the upgrade:
 
-From Quesnelia Release Notes:
 
-### I.ii) Postgres Upgrade
+### I.ii) From Quesnelia Release Notes:
+#### 1.) Postgres Upgrade
 Migrate from PostgreSQL 12 to a more recent version by November 14, 2024.
 PostgreSQL 12 will reach end of life (no security fixes!) on November 14, 2024.
 FOLIO officially supports PostgreSQL 16 from Quesnelia on.
+These are the high-level steps for moving your data to a new PostgreSQL database with a higher major version:
+
+    - das System vom Netz nehmen 
+    - Alle Anwendungen stoppen, die Datenbankverbindung zur der postgres haben:
+      sudo systemctl stop okapi
+      (Stripes, Kafka und Elasticsearch, sowie die postgres selber, laufen noch)
+
+    Take a backup of your existing database.
+    ***************************************
+    # Vielleicht hier nach vorgehen: https://codebeamer.com/cb/wiki/17817868
+    # Dump all roles on the source database
+    cd $HOME/dbupgrade
+    pg_dumpall -g > roles.postgres12.psql
+    # Dump databases
+    pg_dump okapi > okapi.postgres12.psql
+    pg_dump folio > folio.postgres12.psql  (1,5 GB)
+
+    - nur die Tabellen eines bestimmten Schemas dumpen:
+      # -c = "clean" ; das ist (nur) sinnvoll, wenn man bestehende Datenbanken überschreiben will (hier gibt es aber keine)
+      # pg_dump -U folio -cv --schema=diku_mod_circulation_storage -f folio.diku_mod_circulation_storage-create.sql --dbname=folio
+      pg_dump -U folio -v --schema=diku_mod_circulation_storage -f folio.diku_mod_circulation_storage.sql --dbname=folio
+
+    Create a new database with the desired version.
+    ***********************************************
+    # Vielleicht hier nach vorgehen: https://www.linuxbuzz.com/how-to-install-postgresql-on-ubuntu/
+      # Install prerequisites
+      sudo apt update
+      sudo apt install  gpgv gpgsm gnupg-l10n gnupg dirmngr wget vim -y
+      # Import the PostgreSQL signing key, add the PostgreSQL apt repository and install PostgreSQL.
+      sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+      sudo wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+      sudo apt update
+      sudo apt -y install postgresql-16 postgresql-client-16 postgresql-contrib-16
+      oder einfach nur
+      sudo apt -y install postgresql-16 postgresql-contrib-16
+  Reading package lists... Done
+  Building dependency tree... Done
+  Reading state information... Done
+  Note, selecting 'postgresql-16' instead of 'postgresql-contrib-16'
+  Some packages could not be installed. This may mean that you have
+  requested an impossible situation or if you are using the unstable
+  distribution that some required packages have not yet been created
+  or been moved out of Incoming.
+  The following information may help to resolve the situation:
+
+  The following packages have unmet dependencies:
+   postgresql-16 : Depends: postgresql-common (>= 252~) but 238 is to be installed
+                   Depends: libllvm15 but it is not installable
+  E: Unable to correct problems, you have held broken packages.
+      hier weiter
+
+    Eigentlich muss auch alles gemacht werden, was man bei der Installation von Postgres 12 gemacht hat:
+
+    Configure PostgreSQL to listen on all interfaces and allow connections from all addresses (to allow Docker connections).
+
+    Edit (via sudo) the file /etc/postgresql/12/main/postgresql.conf to add line listen_addresses = '*' in the "Connection Settings" section.
+    In the same file, increase max_connections (e.g. to 500)
+    In the same file, change log_timezone and timezone, otherwise they will be UTC.
+    Edit (via sudo) the file /etc/postgresql/12/main/pg_hba.conf to add line host all all 0.0.0.0/0 md5
+    Restart PostgreSQL with command sudo systemctl restart postgresql
+
+
+    Restore the backup to your new database.
+    ****************************************
+    Run VACUUM ANALYZE; command to reorganize PostgreSQL indices. For better performance, it can be started parallel using the following command: VACUUM (PARALLEL 4, ANALYZE); where 4 is the number of allocated processors in server.
+
+    - Okapi restart
+    - das System wieder ans Netz bringen
+
+#### 2.) mod-data-export-spring
+This manual task is only needed if at least one other tenant stays on Poppy. This manual task is not needed if all tenants are migrated to Quesnelia at the same time.
+Before migrating a tenant from Poppy to Quesnelia run
+UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '8:cd7cacfe2480c5305d1eaff157a35e4f' WHERE id = 'quartz-init' .
+After the migration run
+UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '9:89aea1286f2c2901835da380fa17eff7' WHERE id = 'quartz-init' .
+
+Without the manual task the Poppy version of mod-data-export-spring fails and shuts down on start and restart with 
+"Change failed validation!
+ Error creating bean with name 'quartzSchemaInitializer'
+ initial-schema.xml::quartz-init::quartz was: 9:89aea1286f2c2901835da380fa17eff7 but is now: 8:cd7cacfe2480c5305d1eaff157a35e4f"
 
 ### More preparatory steps
 There might be more preparatory steps that you need to take into account for your installation. If you are unsure what other steps you might need to take, study carefully the Release Notes.  Do all actions in the column "Action required", as appropriate for your installation.
@@ -479,6 +559,19 @@ https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1407190/Script+to+upda
 #### 2.) Data Import Job Profiles
 Run script to identify Job Profiles that need to be reviewed and corrected.
 https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/168788217
+
+#### 3.) mod-data-export-spring
+This manual task is only needed if at least one other tenant stays on Poppy. This manual task is not needed if all tenants are migrated to Quesnelia at the same time.
+Before migrating a tenant from Poppy to Quesnelia run
+UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '8:cd7cacfe2480c5305d1eaff157a35e4f' WHERE id = 'quartz-init' .
+After the migration run
+UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '9:89aea1286f2c2901835da380fa17eff7' WHERE id = 'quartz-init' .
+
+Without the manual task the Poppy version of mod-data-export-spring fails and shuts down on start and restart with 
+"Change failed validation!
+ Error creating bean with name 'quartzSchemaInitializer'
+ initial-schema.xml::quartz-init::quartz was: 9:89aea1286f2c2901835da380fa17eff7 but is now: 8:cd7cacfe2480c5305d1eaff157a35e4f"
+
 
 ### VII.ii) Recreate OpenSearch or Elasticsearch index
 Sometimes we need to recreate OpenSearch or Elasticsearch index, for example when a breaking change has been introduced to index structure (mapping). We must re-index after migrating to Poppy. It can be fixed by running reindex request:
