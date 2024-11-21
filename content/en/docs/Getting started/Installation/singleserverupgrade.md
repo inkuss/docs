@@ -111,6 +111,34 @@ These are the high-level steps for moving your data to a new PostgreSQL database
    postgresql-16 : Depends: postgresql-common (>= 252~) but 238 is to be installed
                    Depends: libllvm15 but it is not installable
   E: Unable to correct problems, you have held broken packages.
+
+    21.11.2024
+    pg_upgrade -b oldbindir [-B newbindir] -d oldconfigdir -D newconfigdir [option...]
+    # dazu muss man wohl zunächst postgres 16 installiert haben.
+    # Folge https://www.postgresql.org/download/linux/ubuntu/
+    apt install postgresql
+    sudo apt install -y postgresql-common
+    sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+    sudo apt install curl ca-certificates
+    sudo install -d /usr/share/postgresql-common/pgdg
+    sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+    sudo apt update
+    sudo apt -y install postgresql-16
+  Reading package lists... Done
+  Building dependency tree... Done
+  Reading state information... Done
+  Some packages could not be installed. This may mean that you have
+  requested an impossible situation or if you are using the unstable
+  distribution that some required packages have not yet been created
+  or been moved out of Incoming.
+  The following information may help to resolve the situation:
+
+  The following packages have unmet dependencies:
+   postgresql-16 : Depends: postgresql-common (>= 252~) but 238 is to be installed
+                   Depends: libllvm15 but it is not installable
+  E: Unable to correct problems, you have held broken packages.
+
       hier weiter
 
     Eigentlich muss auch alles gemacht werden, was man bei der Installation von Postgres 12 gemacht hat:
