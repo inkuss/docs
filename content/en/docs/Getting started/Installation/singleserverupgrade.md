@@ -65,11 +65,13 @@ FOLIO officially supports PostgreSQL 16 from Quesnelia on.
 These are the high-level steps for moving your data to a new PostgreSQL database with a higher major version:
 
     - das System vom Netz nehmen 
+    1. Disable or suspend any applications that write to your existing database. 
+    *****************************************************************************
     - Alle Anwendungen stoppen, die Datenbankverbindung zur der postgres haben:
       sudo systemctl stop okapi
       (Stripes, Kafka und Elasticsearch, sowie die postgres selber, laufen noch)
 
-    Take a backup of your existing database.
+    2. Take a backup of your existing database.
     ***************************************
     # Vielleicht hier nach vorgehen: https://codebeamer.com/cb/wiki/17817868
     # Dump all roles on the source database
@@ -84,7 +86,7 @@ These are the high-level steps for moving your data to a new PostgreSQL database
       # pg_dump -U folio -cv --schema=diku_mod_circulation_storage -f folio.diku_mod_circulation_storage-create.sql --dbname=folio
       pg_dump -U folio -v --schema=diku_mod_circulation_storage -f folio.diku_mod_circulation_storage.sql --dbname=folio
 
-    Create a new database with the desired version.
+    3. Create a new database with the desired version.
     ***********************************************
     # Vielleicht hier nach vorgehen: https://www.linuxbuzz.com/how-to-install-postgresql-on-ubuntu/
       # Install prerequisites
@@ -113,8 +115,6 @@ These are the high-level steps for moving your data to a new PostgreSQL database
   E: Unable to correct problems, you have held broken packages.
 
     21.11.2024
-    pg_upgrade -b oldbindir [-B newbindir] -d oldconfigdir -D newconfigdir [option...]
-    # dazu muss man wohl zunächst postgres 16 installiert haben.
     # Folge https://www.postgresql.org/download/linux/ubuntu/
     apt install postgresql
     sudo apt install -y postgresql-common
@@ -139,26 +139,115 @@ These are the high-level steps for moving your data to a new PostgreSQL database
                    Depends: libllvm15 but it is not installable
   E: Unable to correct problems, you have held broken packages.
 
-      hier weiter
+    22.11.2024
+     Mariusz hat im SuSE-Manager auf Ubuntu 22 umgestellt.
+     Jetzt geht
+        sudo apt -y install postgresql-16 postgresql-client-16 postgresql-contrib-16
 
-    Eigentlich muss auch alles gemacht werden, was man bei der Installation von Postgres 12 gemacht hat:
+    Es muss auch alles gemacht werden, was man bei der Installation von Postgres 12 gemacht hat:
 
-    Configure PostgreSQL to listen on all interfaces and allow connections from all addresses (to allow Docker connections).
+    # Configure PostgreSQL to listen on all interfaces and allow connections from all addresses (to allow Docker connections).
 
-    Edit (via sudo) the file /etc/postgresql/12/main/postgresql.conf to add line listen_addresses = '*' in the "Connection Settings" section.
-    In the same file, increase max_connections (e.g. to 500)
-    In the same file, change log_timezone and timezone, otherwise they will be UTC.
+    cd  /etc/postgresql/16/main
+    Edit (via sudo) the file /etc/postgresql/16/main/postgresql.conf 
+      add line listen_addresses = '*' in the "Connection Settings" section.
+      In the same file, increase max_connections = 1200
+      In the same file, change log_timezone and timezone, otherwise they will be UTC.
     Edit (via sudo) the file /etc/postgresql/12/main/pg_hba.conf to add line host all all 0.0.0.0/0 md5
+       cp ../../12/main/pg_hba.conf .  ## aber es war wirklich nur eine Zeile hinzugefügt ==> nur eine Zeile hinzufügen.
     Restart PostgreSQL with command sudo systemctl restart postgresql
+    Die postgresql-16 läuft jetzt auf dem Port
+           port = 5433 in postgresql.conf
+    Es laufen jetzt beide postgresql.
+    Nach erfolgter Datenmigration muss der Port in der postgresql.conf auf 5432 geändert werden + Restart !
+    postgresql-12 kann dann deinstalliert werden.
 
 
-    Restore the backup to your new database.
-    ****************************************
+
+    4. Restore the backup to your new database.
+    *******************************************
+      # -b = bindir (alt), -d = datadir (alt), -o : Optionen, die direkt an das alte postgres-Kommando übergeben werden
+      # -B = bindir (neu), -D = datadir (neu), -O : Optionen, die direkt an das neue postgres-Kommando übergeben werden
+    pg_upgrade -b /usr/lib/postgresql/12/bin -B /usr/lib/postgresql/16/bin -d /var/lib/postgresql/12/main -D /var/lib/postgresql/16/main [option...]
+    -o '-c config_file=/etc/postgresql/12/main/postgresql.conf'
+    -O '-c config_file=/etc/postgresql/16/main/postgresql.conf'
+    -p 5432 -P 5433
+    --check --verbose
+    [ -U postgresql ]
+
+    # Migration der Daten ohne Dumps (mit pg_upgrade):
+    systemctl stop postgresql
+    cd /usr/folio/dbupgrade (das Verzeichnis muss postgres:postgres gehören)
+    su - postgres
+    ./ks.upgrade.sh # erst mit --check laufen lassen, dann ohne
+    # logfiles sind in /var/lib/postgresql/16/main/pg_upgrade_output.d
+    Der Upgrade war erfolgreich:
+    Your installation contains extensions that should be updated with the ALTER EXTENSION command.  The file update_extensions.sql when executed by psql by the database superuser will update these extensions.
+"/usr/lib/postgresql/16/bin/pg_ctl" -w -D "/var/lib/postgresql/16/main" -o "-c config_file=/etc/postgresql/16/main/postgresql.conf" -m smart stop >> "/var/lib/postgresql/16/main/pg_upgrade_output.d/20241122T121638.416/log/pg_upgrade_server.log" 2>&1
+
+Upgrade Complete
+----------------
+Optimizer statistics are not transferred by pg_upgrade.
+Once you start the new server, consider running:
+    /usr/lib/postgresql/16/bin/vacuumdb --all --analyze-in-stages
+Running this script will delete the old cluster's data files:
+    ./delete_old_cluster.sh
+
+    Jetzt die postgresql-12 deinstallieren.
+       sudo apt-get --purge remove postgresql-12
+       # don't optionally remove postgresql directories after the purge
+       # das hat auch postgresql-17 installiert
+    Anschließend  den Port der postgresql-16 in der postgresql.conf auf 5432 ändern.
+      cd /etc/postgresql/16/main ; vim postgresql.conf
+      auch den Port der postgresql-12 (...die hat er nicht deinstalliert) nach 5433 ändern. Postgresql 17 ist auf 5434.
+    Dann Start der postgresql-16.
+      erst eine Datei ~/.postgresqlrc mit folgendem Inhalt angelegt (das funktioniert wahrscheinlich nicht)
+# Version Clustername Database
+16 main postgres
+      das für alle 3 User gemacht: folio, root, postgres.
+      systemctl stop postgresql
+      systemctl start postgresql
+      # das geht. Die 17 ist auch gestartet, aber sei's drum. Die 12 ist nicht gestartet.
+      # Die 17 auch noch entfernen:
+       systemctl stop postgresql
+       sudo apt-get --purge remove postgresql-17
+       # don't optionally remove postgresql directories after the purge
+       systemctl start postgresql
+       # Jetzt scheint das System in einem sauberen Zustand zu sein
+       su - postgres ; psql ; \dg; zeigt die Rollen an.
+    Jetzt noch die 3 o.g. Skripte ausführen:
+       su - postgres
+       /usr/lib/postgresql/16/bin/vacuumdb --all --analyze-in-stages
+vacuumdb: processing database "folio": Generating minimal optimizer statistics (1 target)
+vacuumdb: processing database "folio_modules": Generating minimal optimizer statistics (1 target)
+vacuumdb: processing database "okapi": Generating minimal optimizer statistics (1 target)
+vacuumdb: processing database "postgres": Generating minimal optimizer statistics (1 target)
+vacuumdb: processing database "template1": Generating minimal optimizer statistics (1 target)
+vacuumdb: processing database "folio": Generating medium optimizer statistics (10 targets)
+vacuumdb: processing database "folio_modules": Generating medium optimizer statistics (10 targets)
+vacuumdb: processing database "okapi": Generating medium optimizer statistics (10 targets)
+vacuumdb: processing database "postgres": Generating medium optimizer statistics (10 targets)
+vacuumdb: processing database "template1": Generating medium optimizer statistics (10 targets)
+vacuumdb: processing database "folio": Generating default (full) optimizer statistics
+vacuumdb: processing database "folio_modules": Generating default (full) optimizer statistics
+vacuumdb: processing database "okapi": Generating default (full) optimizer statistics
+vacuumdb: processing database "postgres": Generating default (full) optimizer statistics
+vacuumdb: processing database "template1": Generating default (full) optimizer statistics
+       cd /usr/folio/dbupgrade
+       su - postgres ; psql -f update_extensions.sql
+      ./delete_old_cluster.sh # das entfernt /var/lib/postgresql/12/main
+
+    ODER (nicht gemacht)
+    cd ~/dbupgrade
+    # einspielen der Dumps (nicht gemacht)
     Run VACUUM ANALYZE; command to reorganize PostgreSQL indices. For better performance, it can be started parallel using the following command: VACUUM (PARALLEL 4, ANALYZE); where 4 is the number of allocated processors in server.
 
     - Okapi restart
+      ssh folio@folio-hbz5 ; sudo su ; systemctl start okapi.service ; das okapi-log verfolgen
     - das System wieder ans Netz bringen
+       testen der beiden Mandanten; sind User- und Katalogdaten verfügbar ? Ja
 
+      hier weiter
 #### 2.) mod-data-export-spring
 This manual task is only needed if at least one other tenant stays on Poppy. This manual task is not needed if all tenants are migrated to Quesnelia at the same time.
 Before migrating a tenant from Poppy to Quesnelia run
