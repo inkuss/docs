@@ -485,10 +485,10 @@ Increase "Memory" in the Launch Descriptor of mod-agreements-7.0.9 to 8 GB, if y
       "value" : "noreply@folio-hbz5.hbz-nrw.de"
     }, {
       "name" : "EMAIL_USERNAME",
-      "value" : "hbz_admin"
+      "value" : ""
     }, {
       "name" : "EMAIL_PASSWORD",
-      "value" : "Maus20"
+      "value" : ""
     }, {
       "name" : "EMAIL_SMTP_HOST",
       "value" : "listen.hbz-nrw.de"
