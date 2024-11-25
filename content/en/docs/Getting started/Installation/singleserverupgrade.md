@@ -247,11 +247,11 @@ vacuumdb: processing database "template1": Generating default (full) optimizer s
     - das System wieder ans Netz bringen
        testen der beiden Mandanten; sind User- und Katalogdaten verfügbar ? Ja
 
-      hier weiter
 #### 2.) mod-data-export-spring
 This manual task is only needed if at least one other tenant stays on Poppy. This manual task is not needed if all tenants are migrated to Quesnelia at the same time.
 Before migrating a tenant from Poppy to Quesnelia run
 UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '8:cd7cacfe2480c5305d1eaff157a35e4f' WHERE id = 'quartz-init' .
+  ERROR:  relation "mod_data_export_spring_quartz.databasechangelog" does not exist
 After the migration run
 UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '9:89aea1286f2c2901835da380fa17eff7' WHERE id = 'quartz-init' .
 
@@ -293,12 +293,6 @@ git stash pop
 Upgrade the Okapi version and restart Okapi.
 Read the Poppy Okapi version from install.json: **okapi-5.3.0**
 
-Set JAVA_HOME in .profile if you haven't already done so
-```
-  echo export JAVA_HOME=`readlink -f /usr/bin/javac | sed "s:bin/javac::"` >> ~/.profile
-  source ~/.profile
-```
-
 Build Okapi from source
 ```
   cd /usr/folio/okapi
@@ -308,14 +302,6 @@ Build Okapi from source
     ...
     [INFO] BUILD SUCCESS
 ```
-
-If you have built Okapi from source for the first time you may need to adjust LIB_DIR in /etc/default/okapi so that the Okapi service script (/lib/systemd/system/okapi.service) will find the newly built jar file:
-```
-  edit /etc/default/okapi
-  LIB_DIR="/usr/folio/okapi/okapi-core/target"
-```
-
-If you have built Okapi from source for the first time you need to create a file okapi.json in /etc/folio/okapi. This file complements the file okapi.conf in the same directory. Here is a such file with default values: [okapi.json]({{< ref "okapi.json" >}}).
 
 Restart Okapi
 ```
@@ -328,7 +314,7 @@ Now Okapi will re-start your modules. Follow the okapi.log. It will run for 5 mi
 
 ```
 docker ps | grep "mod-" | wc
-  65
+  67
 ```
 The above number applies if you had installed a complete platform of Orchid, previously.
 
@@ -342,7 +328,8 @@ curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules
 } ]
 ```
 
-If you are starting with a complete platform of Orchid, you will see 9 Edge modules, 59 Frontend modules (folio_\*), 65 Backend modules (mod-\*) and the Quesnelia version of Okapi (5.3.0).
+If you are starting with a complete platform of Poppy, you will see 11 Edge modules, 62 Frontend modules (folio_\*), 67 Backend modules (mod-\*) and the Quesnelia version of Okapi (5.3.0).
+
 
 ### II.iii) Pull module descriptors from the central registry
 
@@ -358,10 +345,9 @@ Okapi log should show something like
  INFO  ProxyContent         759951/proxy REQ 127.0.0.1:58954 supertenant POST /_/proxy/pull/modules okapi-5.3.0
  INFO  PullManager          Remote registry at https://folio-registry.dev.folio.org is version 5.3.0
  INFO  PullManager          pull smart
- INFO  PullManager          pull: 1440 MDs to insert
- INFO  ProxyContent         759951/proxy RES 200 32114437us okapi-5.3.0 /_/proxy/pull/modules
+ INFO  PullManager          pull: 3063 MDs to insert
+ INFO  ProxyContent         895575/proxy RES 200 10228989us okapi-5.3.0 /_/proxy/pull/modules
 ```
-
 
 ### II.iv) Configure Module Environment Variables
 This part is the one in which a system operator needs to take the most care and will probably spend the most time on.
@@ -388,14 +374,14 @@ Log in as these users with this password. If that doesn't work, change the passw
 
 #### i. Set new global environment variables
 Set the ENV var -- only required in a multi-tenant environment
-If you are in a multi-tenant environment, set environment variable ENV to ENV = poppy . In a single tenant environment, you don't need to set it . It has the default value ENV = folio.
+If you are in a multi-tenant environment, set environment variable ENV to ENV = quesnelia . In a single tenant environment, you don't need to set it . It has the default value ENV = folio.
 ```
-curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"ENV\",\"value\":\"poppy\"}" http://localhost:9130/_/env
+curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"ENV\",\"value\":\"quesnelia\"}" http://localhost:9130/_/env
 ```
 
 Set INNREACH_TENANTS - otherwise mod-inn-reach will not start for your tenant:
 ```
-curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"INNREACH_TENANTS\",\"value\":\"diku\"}" http://localhost:9130/_/env
+curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"INNREACH_TENANTS\",\"value\":\"diku|bthvn\"}" http://localhost:9130/_/env
 ```
 If you have multiple tenant, separate their names by "|" in the INNREACH_TENANTS variable's value.
 
@@ -404,31 +390,31 @@ Make sure KAFKA_HOST and KAFKA_PORT are set in /env, otherwise mod-user will fai
 Set DB_CONNECTION_TIMEOUT to at least 250, otherwise mod-entities-links will fail startup.
   
 #### ii. Incompatible Hazelcast version in mod-remote-storage
-During the upgrade, the Orchid and Poppy versions of mod-remote-storage will run in parallel. This will only work if they are on different Hazelcast clusters. Set the Hazelcast cluster name for the Poppy version to "poppy":
+During the upgrade, the Poppy and Quesnelia versions of mod-remote-storage will run in parallel. This will only work if they are on different Hazelcast clusters. Set the Hazelcast cluster name for the Quesnelia version to "quesnelia":
 ```
-  # Configure mod-remote-storage-3.0.1 (Poppy version)
+  # Configure mod-remote-storage-3.2.0 (Quesnelia version)
   cd ~/folio-install
   # 1. Copy the module descriptor into a file
-  curl -w '\n' -D -  http://localhost:9130/_/proxy/modules/mod-remote-storage-3.0.1 > mod-remote-storage-3.0.1-module-descriptor.json
+  curl -w '\n' -D -  http://localhost:9130/_/proxy/modules/mod-remote-storage-3.2.0 > mod-remote-storage-3.2.0-module-descriptor.json
   # 2. Add env var in launch descriptor manually :
-      "name" : "HZ_CLUSTERNAME", "value" : "poppy"
+      "name" : "HZ_CLUSTERNAME", "value" : "quesnelia"
   # 3. Delete the module descriptor
-  curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-remote-storage-3.0.1
+  curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-remote-storage-3.2.0
   # 4. Send the new module descriptor to /_/proxy/modules
-   curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-remote-storage-3.0.1-module-descriptor.json http://localhost:9130/_/proxy/modules
+   curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-remote-storage-3.2.0-module-descriptor.json http://localhost:9130/_/proxy/modules
 ```
 
 #### iii. OAI-PMH (mod-oai-pmh) configuration.
 Of course you only need to do this if you want to _utilize_ the oai-pmh interface of your (test or demo FOLIO) instance.
 For stable operation, mod-oai-pmh  requires the following memory configuration: 
+  Editiere mod-oai-pmh-3.13.2-module-descriptor.json
 ```
 Java: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx2160m
-Amazon Container: cpu - 2048, memory - 3072, memoryReservation - 2765
 ```
 edge-oai-pmh memory settings remain the same as in previous releases: 
+  Editiere edge-oai-pmh-2.9.2-module-descriptor.json
 ```
 Java: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx1440m
-Amazon Container: cpu - 1024, memory - 1512, memoryReservation - 1360
 ```
 
 #### iv. S3 storage compatible environment variables
@@ -441,49 +427,101 @@ Modules that now also make use of it are:
   mod-lists - in order to support exporting list contents.
   mod-entities-links
   mod-data-export
-Set at least those env vars in these modules (edit the launch descriptor):
+  Set at least these env vars in these modules (set them in Okapi's global env):
        S3_URL, S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY.
-Remove all AWS_* vars as they are replaced by S3_*. Set
-  EXPORT_IDS_BATCH = 1000
-  EXPORT_FILES_MAX_POOL_SIZE = 10
+  Remove all AWS_* vars as they are replaced by S3_*. Set
+
+  Teste Browser-Zugriff auf den minio-Server:
+    http://folio-minio.hbz-nrw.de:9090/
+    Login: folioadmin, Passw: folIko23
+    #Login: minioadmin, Passw: minioadmin
+
+  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_IDS_BATCH\",\"value\":\"1000\"}" http://localhost:9130/_/env
+  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_FILES_MAX_POOLSIZE\",\"value\":\"10\"}" http://localhost:9130/_/env
 
 #### v. Set jwt.signing.key for mod-authtoken
-In the launch descriptor of mod-authtoken-2.14.1, set jwt.signing.key in the JAVA_OPTION to the same value as you have set it in the Orchid version of mod-authtoken(2.13.0) :
+In the launch descriptor of mod-authtoken-2.15.2, set jwt.signing.key in the JAVA_OPTION to the same value as you have set it in the Poppy version of mod-authtoken(-2.14.1) :
+Set expiration seconds for expiring tokens (set LEGACY_TOKEN_TENANTS="*" if you do not want to utilize expiring tokens):
 ```
+    "env" : [ {
       "name" : "JAVA_OPTIONS",
-      "value" : "-XX:MaxRAMPercentage=66.0 -Dcache.permissions=true -Djwt.signing.key=folio-demo"
-```
-
-Poppy doesn't support expiring tokens in the frontend, yet. Declare your tenants as legacy tenants or don't set LEGACY_TOKEN_TENANTS and TOKEN_EXPIRATION_SECONDS in mod-authtoken-2.14.1 at all:
-(for details cf. the README of [mod-authtoken](https://github.com/folio-org/mod-authtoken))
-```
- }, {
-      "name" : "LEGACY_TOKEN_TENANTS", 
-      "value" : "*"
+      "value" : "-XX:MaxRAMPercentage=66.0 -Dcache.permissions=true -Dallow.cross.tenant.requests=true -Djwt.signing.key=folio-hbz5-diku"
+      // "value" : "-XX:MaxRAMPercentage=66.0 -Dcache.permissions=true -Djwt.signing.key=folio-demo"
+    }, {
+      "name" : "LEGACY_TOKEN_TENANTS",
+      "value" : ""
     }, {
       "name" : "TOKEN_EXPIRATION_SECONDS",
-      "value" : "tenantId:diku,accessToken:600,refreshToken:604800;tenantId:mytenant,accessToken:3600,refreshToken:604800"
+      "value" : "tenantId:diku,accessToken:3600,refreshToken:604800;tenantId:bthvn,accessToken:3600,refreshToken:604800"
+    }, {
 ```
 
 #### vi. Set env vars for mod-search
-If you have set ENV = quesnelia, set KAFKA_EVENTS_CONSUMER_PATTERN for mod-search, using the value of ENV as a part of its value:
-    KAFKA_EVENTS_CONSUMER_PATTERN = (${ENV}\.)(.*\.)inventory\.(instance|holdings-record|item|bound-with)
+If you have set ENV = quesnelia, set KAFKA_EVENTS_CONSUMER_PATTERN, using the value of ENV as a part of its value:
+  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"KAFKA_EVENTS_CONSUMER_PATTERN\",\"value\":\"(quesnelia\\\.)(.*\\\.)inventory\\\.(instance|holdings-record|item|bound-with)\"}" http://localhost:9130/_/env
     
-If you have set ENV = folio, set  KAFKA_EVENTS_CONSUMER_PATTERN = (folio\.)(.*\.)inventory\.(instance|holdings-record|item|bound-with)
+If you have set ENV = folio, set  KAFKA_EVENTS_CONSUMER_PATTERN = (folio\\\.)(.*\\\.)inventory\\\.(instance|holdings-record|item|bound-with)
 
+in mod-search-3.2.7 ,
+Set KAFKA_EVENTS_CONSUMER_PATTERN = (quesnelia\\.)(.*\\.)inventory\\.(instance|holdings-record|item|bound-with)
+Set other CONSUMER_PATTERNS in the module descriptor, as well.
 Set SEARCH_BY_ALL_FIELDS_ENABLED to "true" if you want to activate the search option "all" (search in all fields). By default, SEARCH_BY_ALL_FIELDS_ENABLED is set to "false".
 
-#### ix. mod-pubsub
-Set SYSTEM_USER_NAME in mod-pubsub. Prevous default was "pub-sub", but that fallback has been removed. Set it explicitely in mod-pubsub. Also set SYSTEM_USER_PASSWORD or use the global value in /env (if a global value has been set, this overrides the values in the launch descriptor).
-
-#### xi. mod-agreements
-Increase "Memory" in the Launch Descriptor of mod-agreements to 8 GB, if you want to connect FOLIO to GOKB.
+#### vii. mod-agreements
+Increase "Memory" in the Launch Descriptor of mod-agreements-7.0.9 to 8 GB, if you want to connect FOLIO to GOKB.
 ```
   "dockerArgs" : {
       "HostConfig" : {
         "Memory" : 8589934592,
 ```
 
+#### viii. E-Mail-Konfiguration für Versand über hbz-SMTP-Server in mod-email anlegen
+  in den Moduldeskriptor von mod-email-1.17.0  einfügeni (aus bisherigem Moduldeskriptor kopieren):
+    }, {
+      "name" : "FOLIO_HOST",
+      "value" : "http://folio-hbz5.hbz-nrw.de"
+    }, {
+      "name" : "EMAIL_FROM",
+      "value" : "noreply@folio-hbz5.hbz-nrw.de"
+    }, {
+      "name" : "EMAIL_USERNAME",
+      "value" : "hbz_admin"
+    }, {
+      "name" : "EMAIL_PASSWORD",
+      "value" : "Maus20"
+    }, {
+      "name" : "EMAIL_SMTP_HOST",
+      "value" : "listen.hbz-nrw.de"
+    }, {
+      "name" : "EMAIL_SMTP_PORT",
+      "value" : "25"
+    }, {
+      "name" : "EMAIL_SMTP_LOGIN_OPTION",
+      "value" : "DISABLED"
+    }, {
+      "name" : "EMAIL_TRUST_ALL",
+      "value" : "true"
+    }, {
+      "name" : "EMAIL_SMTP_SSL",
+      "value" : "false"
+    }, {
+      "name" : "EMAIL_START_TLS_OPTIONS",
+      "value" : "OPTIONAL"
+    }, {
+      "name" : "SERVICE_POINT",
+      "value" : "UUID"
+    }, {
+      "name" : "SELF_CHECKOUT_CONFIG",
+      "value" : "config"
+    }, {
+      "name" : "ACS_TENANT_CONFIG",
+      "value" : "config"
+    }, {
+      "name" : "AUTH_METHODS",
+      "value" : "plain"
+    }, {
+
+      hier weiter
 ### II.v) Run Pre-Upgrade Scripts
 from Quesnelia Release Notes:
 Before or after the Upgrade:
