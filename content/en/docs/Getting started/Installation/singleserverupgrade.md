@@ -485,10 +485,10 @@ Increase "Memory" in the Launch Descriptor of mod-agreements-7.0.9 to 8 GB, if y
       "value" : "noreply@folio-hbz5.hbz-nrw.de"
     }, {
       "name" : "EMAIL_USERNAME",
-      "value" : "hbz_admin"
+      "value" : ""
     }, {
       "name" : "EMAIL_PASSWORD",
-      "value" : "Maus20"
+      "value" : ""
     }, {
       "name" : "EMAIL_SMTP_HOST",
       "value" : "listen.hbz-nrw.de"
@@ -521,30 +521,36 @@ Increase "Memory" in the Launch Descriptor of mod-agreements-7.0.9 to 8 GB, if y
       "value" : "plain"
     }, {
 
-      hier weiter
 ### II.v) Run Pre-Upgrade Scripts
 from Quesnelia Release Notes:
-Before or after the Upgrade:
-Token in the reset password link expires early. Ensure that mod-users-bl’s RESET_PASSWORD_LINK_EXPIRATION_TIME (default: 24 hours) does not exceed mod-authtoken’s token.expiration.seconds (default: 10 minutes)
+  mod-users-bl-7.7.4
+  Before or after the Upgrade:
+ Token in the reset password link expires early. Ensure that mod-users-bl’s RESET_PASSWORD_LINK_EXPIRATION_TIME (default: 24 hours) does not exceed mod-authtoken’s token.expiration.seconds (default: 10 minutes, aber von mir auf 1 Stunde hoch gesetzt)
+   - eine ENV-Variable im Moduldeskriptor hinzufügen:
+       }, {
+      "name" : "RESET_PASSWORD_LINK_EXPIRATION_TIME",
+      "value" : "3600"
+   
 
 ## III. Create new Frontend : Stripes
-
-Create a new frontend (but don't deploy it, yet).
-Install Stripes and nginx in a Docker container. Use the docker file in platform-complete/docker.
-Check if everything looks o.k. in platform-complete/docker. 
-If you have successfully installed last time, you should not need to change anything. Just do a "git diff".
-
-```
-cd ~/platform-complete
-git diff
-```
-
-Check if docker/Dockerfile, docker/nginx.conf and stripes.conifg.js look o.k.
-
-Build the docker container which will contain Stripes and nginx :
-  
-```
-  docker build -f docker/Dockerfile --build-arg OKAPI_URL=http(s)://<YOUR_DOMAIN_NAME>/okapi --build-arg TENANT_ID=diku -t stripes .
+   Wir bauen zwei Stripes-Container für die beiden Mandanten (aber sie werden noch nicht deployed):
+   Wir benutzen das Dockerfile in platform-complete/docker.
+   Überprüfe platform-complete/docker: vim Dockerfile nginx.conf .
+   Wenn letzesmal erfolgreich installiert wurde, sollte jetzt nichts zu ändern sein. Einfach "git diff" machen.
+   cd ~/platform-complete
+   git diff
+   vim stripes.config.js
+       - aboutInstallVersion anpassen => Quesnelia
+       - aboutInstallDate auf aktuelles Datum ändern
+   Benutze
+     // use RTR instead of insecure legacy endpoints
+     // since Q, default: FALSE
+     // since R, default: TRUE, cannot be overridden
+     useSecureTokens: true,
+   in der "config"-Sektion, um Refresh Token Rotation zu aktivieren.
+   sudo su
+   # Build the docker container which will contain Stripes and nginx :
+   docker build -f docker/Dockerfile --build-arg OKAPI_URL=https://hbz-test.folio.hbz-nrw.de/okapi --build-arg TENANT_ID=diku -t stripes .
 Sending build context to Docker daemon  61.96MB
 Step 1/21 : FROM node:18-alpine as stripes_build
 ...
@@ -554,12 +560,28 @@ Removing intermediate container 71e5acf59c42
  ---> 9c2c6b792eec
 Successfully built 9c2c6b792eec
 Successfully tagged stripes:latest
-```
+  Das läuft ca. 10 Minuten.
 
-This will run for approximately 10 minutes. 
-Build more Stripes docker containers for any other tenants that you might host.
+   cd /usr/folio/platform-complete-bthvn
+   # erstmal die neue Plattform ausleihen!
+   git fetch
+   git stash save
+   git checkout master
+   git pull
+   git checkout R1-2024-csp-6
+   git stash pop
+   vim docker/Dockerfile docker/nginx.conf (nichts zu tun)
+   vim stripes.config.js
+       - den Konflikt auflösen
+       - aboutInstallVersion anpassen => Quesnelia
+       - aboutInstallDate auf aktuelles Datum ändern
+       - useSecureTokens: true
+   git add stripes.config.js
+   sudo su
+   docker build -f docker/Dockerfile --build-arg OKAPI_URL=https://bthvn-test.folio.hbz-nrw.de/okapi --build-arg TENANT_ID=bthvn -t stripes_bthvn .
 
 ## IV. Deploy a new FOLIO backend and enable all modules of the new platform (backend & frontend)
+
 Now do a snapshot of your system, so you will be able to replay the current status in case the upgrade fails.
 Users should stop working with the system now because after the new backend has been deployed, the front end will be incompatible to the backend and will need to be redeployed, too.
 
@@ -581,23 +603,27 @@ Don't continue before all new modules have been deployed. Check by executing
 ```
 docker ps | grep mod- | wc
 ```
-This number should go up to 131 before you continue.
-This number comprises of 65 backend modules from Orchid plus 66 new backend module versions from the Poppy release.
-There is 1 module which is present in both releases in the same module version and it has not been deployed twice: mod-rtac:3.5.0.
+This number should go up to 135 before you continue.
+This number comprises of 67 backend modules from Poppy and 71 backend modules from the Quesnelia release.
+There are 3 modules which are present in both releases in the same module version and have not been deployed twice ??
 
-We finish up by enabeling all modules (backend & frontend) with a single call without deploying any. 
-There is a choice of whether or not to load reference data (of the modules) upon enabeling them. There are pros and cons to either of the choice:
-- If we don't load reference data, reference data that have already been loaded and have been changed locally will be kept (which is good).
-  However, if we don't load reference data, any new reference data will not be loaded and we might need to load them manually after the upgrade process.
-- If we do load reference data, local changes to reference data might become overwritten and will need to be corrected manually, later.
+We finish up by enabeling all modules (backend & frontend) with a single call without deploying any.
 
-We here choose to load reference data for all modules . If library has changed any reference data and migrates using loadReference = true: Make a backup before migration and restore afterwards. From Quesnelia Release Notes: "Migration from Poppy to Quesnelia resets reference data. 
-Other modules don’t touch existing reference data when migrating with parameter loadReference = true, but mod-circulation-storage does.
-Most notable reference data that gets reset to default: Circulation rules."
+  We here choose to load reference data for all modules . If library has changed any reference data and migrates using loadReference = true: Make a backup before migration and restore afterwards. From Quesnelia Release Notes: "Migration from Poppy to Quesnelia resets reference data. 
+  Other modules don’t touch existing reference data when migrating with parameter loadReference = true, but mod-circulation-storage does.
+  Most notable reference data that gets reset to default: Circulation rules."
 
-```
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
-```
+HTTP/1.1 400 Bad Request
+Content-Type: text/plain
+content-length: 73
+
+No running instances for module mod-lists-2.0.6. Can not invoke /_/tenant`
+   es läuft nur mod-lists-1.0.5.  Da muss was nicht hoch gekommen sein.
+      hier weiter
+
+    Das dauert 90 Sekunden pro Mandant.
+
 Repeat this step for any other tenants (who have enabled platform-complete) on your system.
 
 If that fails, remedy the error cause and try again until the post succeeds. 
