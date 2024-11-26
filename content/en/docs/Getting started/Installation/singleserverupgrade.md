@@ -371,6 +371,7 @@ Make sure SYSTEM_USER_PASSWORD in /\_/env is the actual password for these syste
   - mod-innreach   (if you are utilizing this module)
 
 Log in as these users with this password. If that doesn't work, change the password of these system users to the value of the system variable SYSTEM_USER_PASSWORD.
+  => das ist in Zukunft nicht mehr nötig. Es ist der Fall und für neue User ist es automatisch der Fall, z.B. dcb-system-user, neu in Quesnelia.
 
 #### i. Set new global environment variables
 Set the ENV var -- only required in a multi-tenant environment
@@ -589,6 +590,10 @@ Successfully tagged stripes:latest
 
 Now do a snapshot of your system, so you will be able to replay the current status in case the upgrade fails.
 Users should stop working with the system now because after the new backend has been deployed, the front end will be incompatible to the backend and will need to be redeployed, too.
+  Das System (erneut, nach dem Postgres-Upgrade) vom Netz nehmen.
+
+  Besser Kafka runter fahren ; mod-dcb ist mit Kafka bei der Aktivierung abgestürzt.
+  sudo su; cd /opt/kafka-zk ; docker-compose down
 
 Deploy all backend modules of the new release with a single post to okapi's install endpoint. 
 This will deploy and enable all new modules. Start with a simulation run:
@@ -627,6 +632,7 @@ We finish up by enabeling all modules (backend & frontend) with a single call wi
   mod-list-2.0.6 erstmals deployed (Quesnelia-Version), aber dabei werden auch mod-agreements-6.1.9 und mod-licenses-5.0.3 zusätzlich deployed ! Alte Versionen (pre-Quesnelia), können nach Q-Upgrade direkt wieder weg.
   diku lässt sich jetzt aktivieren.
   bei bthvn bricht es ab; außerdem schreibt mod-quick-marc das log voll: => Letzteres in /usr/folio/bin/delete_log.sh und einen Eintrag in der crontab für root behoben.
+      ==> Grund dafür ist wahrscheinlich, dass Kafka während der Aktivierung läuft
 
   HTTP/1.1 400 Bad Request
 Content-Type: text/plain
@@ -675,25 +681,43 @@ java.lang.IllegalArgumentException: No enum constant org.folio.dcb.utils.KafkaEv
   mod-dcb war beim Aktivieren des 1. Mandanten herunter gekommen und es lässt sich nun nicht wieder hochfahren oder neu deployen:
    13:20:08 [] [] [] [] WARN  ?                    POST request for mod-dcb-1.1.5 /_/tenant failed with io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed: Connection refused: /10.9.2.86:19155
 org.folio.okapi.common.ErrorTypeException: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed: Connection refused: /10.9.2.86:19155
+    ==> diese Fehler treten wahrscheinlich alle nur auf, wenn Kafka während des Deploy & Enable läuft.
+
+  # mal Kafka runter fahren (ist schon)
+  # sudo su; cd /opt/kafka-zk ; docker-compose down
+  # und versuchen, mod-dcb-1.1.5 wieder hoch zu fahren:
+  # docker start f37669b83a4e
+
+  # Kafka wieder hoch fahren
+  docker-compose up -d
 
   Dann eben bthvn ohne mod-dcb und edge-dcb installieren. action="suggest" in ~/platform-complete-bthvn/install.json.
   Das scheint geklappt zu haben, obowhl der "curl" nicht wieder kommt. 146 Module für bthvn sind aber aktiviert.
+
+  Jetzt noch mal für bthvn alle Module (auch mod-dcb, edge-dcb) aktivieren:
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete-bthvn/install.json http://localhost:9130/_/proxy/tenants/bthvn/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
+  HTTP/1.1 400 Bad Request
+Content-Type: text/plain
+content-length: 302
+
+POST request for mod-dcb-1.1.5 /_/tenant failed with 400: {"errors":[{"message":"[400 Bad Request] during [POST] to [http://inventory/instances] [InstanceClient#createInstance(InventoryInstanceDTO)]: [HRID value already exists in table instance: in00000000002]","type":"-1","code":"VALIDATION_ERROR"}]}
+   Dann eben nicht.
 
   If that fails, remedy the error cause and try again until the post succeeds. 
 
   Das dauert 90 Sekunden pro Mandant.
 
-Repeat this step for any other tenants (who have enabled platform-complete) on your system.
+  Repeat this step for any other tenants (who have enabled platform-complete) on your system.
 
-We will take care of old modules that are not needed anymore but are still running (deployed) in the "Clean up" section.
+  We will take care of old modules that are not needed anymore but are still running (deployed) in the "Clean up" section.
 
        68 Quesnelia-Backend-Module wurden während "deploy=true" für diku hochgefahren. (davon ist mod-dcb herunter gekommen, mod-lists wurde es später hoch gefahren). Es sind aber 71 Backend-Module in Quesnelia. 3 Module sind in Poppy und Quesnelia gleich.
        68 Backend-Module liefen schon vorher (Poppy + mr-specs). Es waren 67 Backend-Module in Poppy (csp-3).
-There should now be 135 modules deployed on your single server, try
-```
+  There should now be 135 modules deployed on your single server, try
+
   docker ps | grep "mod-" | wc
-```
     135 sollen es sein.
+
        Auf folio-hbz5 laufen noch 3 weitere Module, die weder zu Poppy-CSP-3 noch zu Quesnelia-CSP-6 gehören und die nicht benötigt werden (außerdem kommt mod-dcb nicht wieder hoch): 
        702a1c8cf981   folioorg/mod-agreements:6.1.9 
        3d274f3c628f   folioorg/mod-licenses:5.0.3
@@ -719,7 +743,7 @@ curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules | grep id 
 
 This number is the sum of the following:
 
- Poppy CSP-3 Release:
+ Poppy CSP-3 Release: (siehe ~/folio-install/modules.poppy.csv)
  - 62 Frontend modules
  - 11 Edge modules
  - 67 Backend modules
@@ -727,7 +751,7 @@ This number is the sum of the following:
 
 These are all R2-2023 (Poppy) modules.
 
- Quesnelia CSP-6 Release:
+ Quesnelia CSP-6 Release (siehe ~/folio-install/modules.quesnelia.csv)
  - 64 Frontend modules
  - 12 Edge modules
  - 71 Backend modules
@@ -735,36 +759,46 @@ These are all R2-2023 (Poppy) modules.
 
 These are all R1-2024 (Quesnelia) modules.
 
-   hier weiter
 ## V. Start the new Frontend
-Stop the old Stripes container: 
+  Stop the old Stripes container: 
 ```
-docker stop stripes
-docker rm stripes
+  docker stop stripes
+  docker rm stripes
 ```
-Start the new stripes container.
-Redirect port 80 from the outside to port 80 of the docker container:
+  Start the new stripes container.
+  Redirect port 80 from the outside to port 80 of the docker container:
 ```
   cd ~/platform-complete
   sudo su
+  ## systemctl start stripes => das schmeißt zwar Fehlemeldungen, der Container fährt aber hoch.
+  # der Service fährt auf folio-hbz5 nicht hoch, also dann so:
   nohup docker run -d -p 80:80 --name stripes stripes &
 ```
-  
-Clear browser cache.
-Log in to your frontend: E.g., go to http://<YOUR_HOST_NAME>/ in your browser. 
 
-  - Can you see the Poppy modules in Settings - Installation details ?
+Repeat these steps for the Stripes containers of any other tenants.
+
+   docker stop stripes_bthvn
+   docker rm stripes_bthvn
+   cd /usr/folio/platform-complete-bthvn
+   nohup docker run -d -p 90:80 --name stripes_bthvn stripes_bthvn &
+   # systemctl start stripes_bthvn => geht nicht
+  
+Das System wieder ans Netz bringen.
+Clear browser cache.
+Log in to your frontend: Einloggen auf https://hbz-test.folio.hbz-nrw.de, diku_admin:admin
+                         Einloggen auf https://bthvn-test.folio.hbz-nrw.de, bthvn_admin:LvB2023!
+
+  - Can you see the inew Quesnelia modules in Settings - Installation details ?
 
   - Do you see the right Okapi version, 5.3.0 ? 
 
   - Does everything look good ?
 
-Repeat these steps for the Stripes containers of any other tenants.
-
 It is now possible to access the system via the UI, again.
-However, changes in permission sets and long-running migration jobs still need to be carried out before the system can be used productively. You may not see the inventory data, yet.
+However, changes in permission sets and long-running migration jobs still need to be carried out before the system can be used productively. You will not see the inventory data, yet, because a re-index needs to be done, first.
 
 
+   hier weiter
 ## VI. Cleanup
   
 Clean up. 
