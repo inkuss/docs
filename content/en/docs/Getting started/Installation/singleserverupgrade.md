@@ -247,11 +247,11 @@ vacuumdb: processing database "template1": Generating default (full) optimizer s
     - das System wieder ans Netz bringen
        testen der beiden Mandanten; sind User- und Katalogdaten verfügbar ? Ja
 
-      hier weiter
 #### 2.) mod-data-export-spring
 This manual task is only needed if at least one other tenant stays on Poppy. This manual task is not needed if all tenants are migrated to Quesnelia at the same time.
 Before migrating a tenant from Poppy to Quesnelia run
 UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '8:cd7cacfe2480c5305d1eaff157a35e4f' WHERE id = 'quartz-init' .
+  ERROR:  relation "mod_data_export_spring_quartz.databasechangelog" does not exist
 After the migration run
 UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '9:89aea1286f2c2901835da380fa17eff7' WHERE id = 'quartz-init' .
 
@@ -293,12 +293,6 @@ git stash pop
 Upgrade the Okapi version and restart Okapi.
 Read the Poppy Okapi version from install.json: **okapi-5.3.0**
 
-Set JAVA_HOME in .profile if you haven't already done so
-```
-  echo export JAVA_HOME=`readlink -f /usr/bin/javac | sed "s:bin/javac::"` >> ~/.profile
-  source ~/.profile
-```
-
 Build Okapi from source
 ```
   cd /usr/folio/okapi
@@ -308,14 +302,6 @@ Build Okapi from source
     ...
     [INFO] BUILD SUCCESS
 ```
-
-If you have built Okapi from source for the first time you may need to adjust LIB_DIR in /etc/default/okapi so that the Okapi service script (/lib/systemd/system/okapi.service) will find the newly built jar file:
-```
-  edit /etc/default/okapi
-  LIB_DIR="/usr/folio/okapi/okapi-core/target"
-```
-
-If you have built Okapi from source for the first time you need to create a file okapi.json in /etc/folio/okapi. This file complements the file okapi.conf in the same directory. Here is a such file with default values: [okapi.json]({{< ref "okapi.json" >}}).
 
 Restart Okapi
 ```
@@ -328,7 +314,7 @@ Now Okapi will re-start your modules. Follow the okapi.log. It will run for 5 mi
 
 ```
 docker ps | grep "mod-" | wc
-  65
+  67
 ```
 The above number applies if you had installed a complete platform of Orchid, previously.
 
@@ -342,7 +328,8 @@ curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules
 } ]
 ```
 
-If you are starting with a complete platform of Orchid, you will see 9 Edge modules, 59 Frontend modules (folio_\*), 65 Backend modules (mod-\*) and the Quesnelia version of Okapi (5.3.0).
+If you are starting with a complete platform of Poppy, you will see 11 Edge modules, 62 Frontend modules (folio_\*), 67 Backend modules (mod-\*) and the Quesnelia version of Okapi (5.3.0).
+
 
 ### II.iii) Pull module descriptors from the central registry
 
@@ -358,10 +345,9 @@ Okapi log should show something like
  INFO  ProxyContent         759951/proxy REQ 127.0.0.1:58954 supertenant POST /_/proxy/pull/modules okapi-5.3.0
  INFO  PullManager          Remote registry at https://folio-registry.dev.folio.org is version 5.3.0
  INFO  PullManager          pull smart
- INFO  PullManager          pull: 1440 MDs to insert
- INFO  ProxyContent         759951/proxy RES 200 32114437us okapi-5.3.0 /_/proxy/pull/modules
+ INFO  PullManager          pull: 3063 MDs to insert
+ INFO  ProxyContent         895575/proxy RES 200 10228989us okapi-5.3.0 /_/proxy/pull/modules
 ```
-
 
 ### II.iv) Configure Module Environment Variables
 This part is the one in which a system operator needs to take the most care and will probably spend the most time on.
@@ -388,14 +374,14 @@ Log in as these users with this password. If that doesn't work, change the passw
 
 #### i. Set new global environment variables
 Set the ENV var -- only required in a multi-tenant environment
-If you are in a multi-tenant environment, set environment variable ENV to ENV = poppy . In a single tenant environment, you don't need to set it . It has the default value ENV = folio.
+If you are in a multi-tenant environment, set environment variable ENV to ENV = quesnelia . In a single tenant environment, you don't need to set it . It has the default value ENV = folio.
 ```
-curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"ENV\",\"value\":\"poppy\"}" http://localhost:9130/_/env
+curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"ENV\",\"value\":\"quesnelia\"}" http://localhost:9130/_/env
 ```
 
 Set INNREACH_TENANTS - otherwise mod-inn-reach will not start for your tenant:
 ```
-curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"INNREACH_TENANTS\",\"value\":\"diku\"}" http://localhost:9130/_/env
+curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"INNREACH_TENANTS\",\"value\":\"diku|bthvn\"}" http://localhost:9130/_/env
 ```
 If you have multiple tenant, separate their names by "|" in the INNREACH_TENANTS variable's value.
 
@@ -404,31 +390,31 @@ Make sure KAFKA_HOST and KAFKA_PORT are set in /env, otherwise mod-user will fai
 Set DB_CONNECTION_TIMEOUT to at least 250, otherwise mod-entities-links will fail startup.
   
 #### ii. Incompatible Hazelcast version in mod-remote-storage
-During the upgrade, the Orchid and Poppy versions of mod-remote-storage will run in parallel. This will only work if they are on different Hazelcast clusters. Set the Hazelcast cluster name for the Poppy version to "poppy":
+During the upgrade, the Poppy and Quesnelia versions of mod-remote-storage will run in parallel. This will only work if they are on different Hazelcast clusters. Set the Hazelcast cluster name for the Quesnelia version to "quesnelia":
 ```
-  # Configure mod-remote-storage-3.0.1 (Poppy version)
+  # Configure mod-remote-storage-3.2.0 (Quesnelia version)
   cd ~/folio-install
   # 1. Copy the module descriptor into a file
-  curl -w '\n' -D -  http://localhost:9130/_/proxy/modules/mod-remote-storage-3.0.1 > mod-remote-storage-3.0.1-module-descriptor.json
+  curl -w '\n' -D -  http://localhost:9130/_/proxy/modules/mod-remote-storage-3.2.0 > mod-remote-storage-3.2.0-module-descriptor.json
   # 2. Add env var in launch descriptor manually :
-      "name" : "HZ_CLUSTERNAME", "value" : "poppy"
+      "name" : "HZ_CLUSTERNAME", "value" : "quesnelia"
   # 3. Delete the module descriptor
-  curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-remote-storage-3.0.1
+  curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-remote-storage-3.2.0
   # 4. Send the new module descriptor to /_/proxy/modules
-   curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-remote-storage-3.0.1-module-descriptor.json http://localhost:9130/_/proxy/modules
+   curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-remote-storage-3.2.0-module-descriptor.json http://localhost:9130/_/proxy/modules
 ```
 
 #### iii. OAI-PMH (mod-oai-pmh) configuration.
 Of course you only need to do this if you want to _utilize_ the oai-pmh interface of your (test or demo FOLIO) instance.
 For stable operation, mod-oai-pmh  requires the following memory configuration: 
+  Editiere mod-oai-pmh-3.13.2-module-descriptor.json
 ```
 Java: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx2160m
-Amazon Container: cpu - 2048, memory - 3072, memoryReservation - 2765
 ```
 edge-oai-pmh memory settings remain the same as in previous releases: 
+  Editiere edge-oai-pmh-2.9.2-module-descriptor.json
 ```
 Java: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx1440m
-Amazon Container: cpu - 1024, memory - 1512, memoryReservation - 1360
 ```
 
 #### iv. S3 storage compatible environment variables
@@ -441,43 +427,48 @@ Modules that now also make use of it are:
   mod-lists - in order to support exporting list contents.
   mod-entities-links
   mod-data-export
-Set at least those env vars in these modules (edit the launch descriptor):
+  Set at least these env vars in these modules (set them in Okapi's global env):
        S3_URL, S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY.
-Remove all AWS_* vars as they are replaced by S3_*. Set
-  EXPORT_IDS_BATCH = 1000
-  EXPORT_FILES_MAX_POOL_SIZE = 10
+  Remove all AWS_* vars as they are replaced by S3_*. Set
+
+  Teste Browser-Zugriff auf den minio-Server:
+    http://folio-minio.hbz-nrw.de:9090/
+    Login: folioadmin, Passw: folIko23
+    #Login: minioadmin, Passw: minioadmin
+
+  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_IDS_BATCH\",\"value\":\"1000\"}" http://localhost:9130/_/env
+  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_FILES_MAX_POOLSIZE\",\"value\":\"10\"}" http://localhost:9130/_/env
 
 #### v. Set jwt.signing.key for mod-authtoken
-In the launch descriptor of mod-authtoken-2.14.1, set jwt.signing.key in the JAVA_OPTION to the same value as you have set it in the Orchid version of mod-authtoken(2.13.0) :
+In the launch descriptor of mod-authtoken-2.15.2, set jwt.signing.key in the JAVA_OPTION to the same value as you have set it in the Poppy version of mod-authtoken(-2.14.1) :
+Set expiration seconds for expiring tokens (set LEGACY_TOKEN_TENANTS="*" if you do not want to utilize expiring tokens):
 ```
+    "env" : [ {
       "name" : "JAVA_OPTIONS",
-      "value" : "-XX:MaxRAMPercentage=66.0 -Dcache.permissions=true -Djwt.signing.key=folio-demo"
-```
-
-Poppy doesn't support expiring tokens in the frontend, yet. Declare your tenants as legacy tenants or don't set LEGACY_TOKEN_TENANTS and TOKEN_EXPIRATION_SECONDS in mod-authtoken-2.14.1 at all:
-(for details cf. the README of [mod-authtoken](https://github.com/folio-org/mod-authtoken))
-```
- }, {
-      "name" : "LEGACY_TOKEN_TENANTS", 
-      "value" : "*"
+      "value" : "-XX:MaxRAMPercentage=66.0 -Dcache.permissions=true -Dallow.cross.tenant.requests=true -Djwt.signing.key=folio-hbz5-diku"
+      // "value" : "-XX:MaxRAMPercentage=66.0 -Dcache.permissions=true -Djwt.signing.key=folio-demo"
+    }, {
+      "name" : "LEGACY_TOKEN_TENANTS",
+      "value" : ""
     }, {
       "name" : "TOKEN_EXPIRATION_SECONDS",
-      "value" : "tenantId:diku,accessToken:600,refreshToken:604800;tenantId:mytenant,accessToken:3600,refreshToken:604800"
+      "value" : "tenantId:diku,accessToken:3600,refreshToken:604800;tenantId:bthvn,accessToken:3600,refreshToken:604800"
+    }, {
 ```
 
 #### vi. Set env vars for mod-search
-If you have set ENV = quesnelia, set KAFKA_EVENTS_CONSUMER_PATTERN for mod-search, using the value of ENV as a part of its value:
-    KAFKA_EVENTS_CONSUMER_PATTERN = (${ENV}\.)(.*\.)inventory\.(instance|holdings-record|item|bound-with)
+If you have set ENV = quesnelia, set KAFKA_EVENTS_CONSUMER_PATTERN, using the value of ENV as a part of its value:
+  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"KAFKA_EVENTS_CONSUMER_PATTERN\",\"value\":\"(quesnelia\\\.)(.*\\\.)inventory\\\.(instance|holdings-record|item|bound-with)\"}" http://localhost:9130/_/env
     
-If you have set ENV = folio, set  KAFKA_EVENTS_CONSUMER_PATTERN = (folio\.)(.*\.)inventory\.(instance|holdings-record|item|bound-with)
+If you have set ENV = folio, set  KAFKA_EVENTS_CONSUMER_PATTERN = (folio\\\.)(.*\\\.)inventory\\\.(instance|holdings-record|item|bound-with)
 
+in mod-search-3.2.7 ,
+Set KAFKA_EVENTS_CONSUMER_PATTERN = (quesnelia\\.)(.*\\.)inventory\\.(instance|holdings-record|item|bound-with)
+Set other CONSUMER_PATTERNS in the module descriptor, as well.
 Set SEARCH_BY_ALL_FIELDS_ENABLED to "true" if you want to activate the search option "all" (search in all fields). By default, SEARCH_BY_ALL_FIELDS_ENABLED is set to "false".
 
-#### ix. mod-pubsub
-Set SYSTEM_USER_NAME in mod-pubsub. Prevous default was "pub-sub", but that fallback has been removed. Set it explicitely in mod-pubsub. Also set SYSTEM_USER_PASSWORD or use the global value in /env (if a global value has been set, this overrides the values in the launch descriptor).
-
-#### xi. mod-agreements
-Increase "Memory" in the Launch Descriptor of mod-agreements to 8 GB, if you want to connect FOLIO to GOKB.
+#### vii. mod-agreements
+Increase "Memory" in the Launch Descriptor of mod-agreements-7.0.9 to 8 GB, if you want to connect FOLIO to GOKB.
 ```
   "dockerArgs" : {
       "HostConfig" : {
@@ -529,6 +520,11 @@ Increase "Memory" in the Launch Descriptor of mod-agreements to 8 GB, if you wan
       "name" : "AUTH_METHODS",
       "value" : "plain"
     }, {
+
+#### ix. Einstellungen für die Lists-App
+   mod-lists
+   Setze die Umgebungsvariable:
+  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"LIST_APP_S3_BUCKET\",\"value\":\"hbz-test\"}" http://localhost:9130/_/env
 
 ### II.v) Run Pre-Upgrade Scripts
 from Quesnelia Release Notes:
@@ -614,45 +610,116 @@ docker ps | grep mod- | wc
 ```
 This number should go up to 135 before you continue.
 This number comprises of 67 backend modules from Poppy and 71 backend modules from the Quesnelia release.
-There are 3 modules which are present in both releases in the same module version and have not been deployed twice ??
+There are 3 modules which are present in both releases in the same module version and have not been deployed twice ???
 
 We finish up by enabeling all modules (backend & frontend) with a single call without deploying any.
 
-  We here choose to load reference data for all modules . If library has changed any reference data and migrates using loadReference = true: Make a backup before migration and restore afterwards. From Quesnelia Release Notes: "Migration from Poppy to Quesnelia resets reference data. 
-  Other modules don’t touch existing reference data when migrating with parameter loadReference = true, but mod-circulation-storage does.
-  Most notable reference data that gets reset to default: Circulation rules."
+  Exkurs:
+    We here choose to load reference data for all modules . If library has changed any reference data and migrates using loadReference = true: Make a backup before migration and restore afterwards. From Quesnelia Release Notes: "Migration from Poppy to Quesnelia resets reference data. 
+    Other modules don’t touch existing reference data when migrating with parameter loadReference = true, but mod-circulation-storage does.
+    Most notable reference data that gets reset to default: Circulation rules."
 
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
-HTTP/1.1 400 Bad Request
+    HTTP/1.1 200 OK
+
+   26.11.2024
+
+  mod-list-2.0.6 erstmals deployed (Quesnelia-Version), aber dabei werden auch mod-agreements-6.1.9 und mod-licenses-5.0.3 zusätzlich deployed ! Alte Versionen (pre-Quesnelia), können nach Q-Upgrade direkt wieder weg.
+  diku lässt sich jetzt aktivieren.
+  bei bthvn bricht es ab; außerdem schreibt mod-quick-marc das log voll: => Letzteres in /usr/folio/bin/delete_log.sh und einen Eintrag in der crontab für root behoben.
+
+  HTTP/1.1 400 Bad Request
 Content-Type: text/plain
-content-length: 73
+content-length: 175
 
-No running instances for module mod-lists-2.0.6. Can not invoke /_/tenant`
-   es läuft nur mod-lists-1.0.5.  Da muss was nicht hoch gekommen sein.
-      hier weiter
+POST request for mod-dcb-1.1.5 /_/tenant failed with io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed: Connection refused: /10.9.2.86:19155
+    mod-dcb-1.1.5 läuft nicht (das hätte doch für diku schon laufen müssen). ==> abgebrochen vor 25 Minuten beim Aktivieren von bthvn:
+    11:31:53 [423076/proxy;841152/tenant] [diku] [] [mod-dcb] ERROR KafkaEvent           Could not parse input payload for processing event
+java.lang.IllegalArgumentException: No enum constant org.folio.dcb.utils.KafkaEvent.EventType.CREATE
+        at java.base/java.lang.Enum.valueOf(Unknown Source) ~[?:?]
+        at org.folio.dcb.utils.KafkaEvent$EventType.valueOf(KafkaEvent.java:50) ~[!/:1.1.5]
+        at org.folio.dcb.utils.KafkaEvent.setEventType(KafkaEvent.java:31) ~[!/:1.1.5]
+        at org.folio.dcb.utils.KafkaEvent.<init>(KafkaEvent.java:22) ~[!/:1.1.5]
+        at org.folio.dcb.utils.TransactionHelper.parseLoanEvent(TransactionHelper.java:29) ~[!/:1.1.5]
+        at org.folio.dcb.listener.kafka.CirculationEventListener.handleLoanEvent(CirculationEventListener.java:42) ~[!/:1.1.5]
+        at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method) ~[?:?]
+        at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source) ~[?:?]
+        at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source) ~[?:?]
+        at java.base/java.lang.reflect.Method.invoke(Unknown Source) ~[?:?]
+        at org.springframework.messaging.handler.invocation.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:169) ~[spring-messaging-6.1.4.jar!/:6.1.4]
+        at org.springframework.messaging.handler.invocation.InvocableHandlerMethod.invoke(InvocableHandlerMethod.java:119) ~[spring-messaging-6.1.4.jar!/:6.1.4]
+        at org.springframework.kafka.listener.adapter.HandlerAdapter.invoke(HandlerAdapter.java:56) ~[spring-kafka-3.1.2.jar!/:3.1.2]
+        at org.springframework.kafka.listener.adapter.MessagingMessageListenerAdapter.invokeHandler(MessagingMessageListenerAdapter.java:376) ~[spring-kafka-3.1.2.jar!/:3.1.2]
+        at org.springframework.kafka.listener.adapter.RecordMessagingMessageListenerAdapter.onMessage(RecordMessagingMessageListenerAdapter.java:92) ~[spring-kafka-3.1.2.jar!/:3.1.2]
+        at org.springframework.kafka.listener.adapter.RecordMessagingMessageListenerAdapter.onMessage(RecordMessagingMessageListenerAdapter.java:53) ~[spring-kafka-3.1.2.jar!/:3.1.2]
+        at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.doInvokeOnMessage(KafkaMessageListenerContainer.java:2873) ~[spring-kafka-3.1.2.jar!/:3.1.2]
+        at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeOnMessage(KafkaMessageListenerContainer.java:2851) ~[spring-kafka-3.1.2.jar!/:3.1.2]
+        at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.lambda$doInvokeRecordListener$55(KafkaMessageListenerContainer.java:2769) ~[spring-kafka-3.1.2.jar!/:3.1.2]
+        at io.micrometer.observation.Observation.observe(Observation.java:565) [micrometer-observation-1.12.3.jar!/:1.12.3]
+        at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.doInvokeRecordListener(KafkaMessageListenerContainer.java:2767) [spring-kafka-3.1.2.jar!/:3.1.2]
+        at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.doInvokeWithRecords(KafkaMessageListenerContainer.java:2620) [spring-kafka-3.1.2.jar!/:3.1.2]
+        at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeRecordListener(KafkaMessageListenerContainer.java:2506) [spring-kafka-3.1.2.jar!/:3.1.2]
+        at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeListener(KafkaMessageListenerContainer.java:2148) [spring-kafka-3.1.2.jar!/:3.1.2]
+        at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeIfHaveRecords(KafkaMessageListenerContainer.java:1488) [spring-kafka-3.1.2.jar!/:3.1.2]
+        at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.pollAndInvoke(KafkaMessageListenerContainer.java:1453) [spring-kafka-3.1.2.jar!/:3.1.2]
+        at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.run(KafkaMessageListenerContainer.java:1323) [spring-kafka-3.1.2.jar!/:3.1.2]
+        at java.base/java.util.concurrent.CompletableFuture$AsyncRun.run(Unknown Source) [?:?]
+        at java.base/java.lang.Thread.run(Unknown Source) [?:?]
+11:31:54 [423076/proxy;841152/tenant] [diku] [] [mod-dcb] INFO  CustomTenantService  createCancellationReason:: cancellation reason created
+11:31:54 [423076/proxy;841152/tenant] [diku] [] [mod-dcb] INFO  CustomTenantService  createLoanType:: loanType created
+11:31:56 [423076/proxy;841152/tenant] [diku] [] [mod-dcb] INFO  CustomTenantService  createCalendarIfNotExists:: calendar with name DCB Calendar doesn't exists, so creating new calendar
+11:31:57 [423076/proxy;841152/tenant] [diku] [] [mod-dcb] INFO  TenantController     Loading reference data...
+11:31:57 [423076/proxy;841152/tenant] [diku] [] [mod-dcb] WARN  TenantService        A tenant was created with loadReference=true, however, no reference data was created
+11:31:57 [423076/proxy;841152/tenant] [diku] [] [mod-dcb] WARN  TenantService        Please extend TenantService and implement loadReferenceData
 
-    Das dauert 90 Sekunden pro Mandant.
+  mod-dcb war beim Aktivieren des 1. Mandanten herunter gekommen und es lässt sich nun nicht wieder hochfahren oder neu deployen:
+   13:20:08 [] [] [] [] WARN  ?                    POST request for mod-dcb-1.1.5 /_/tenant failed with io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed: Connection refused: /10.9.2.86:19155
+org.folio.okapi.common.ErrorTypeException: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed: Connection refused: /10.9.2.86:19155
+
+  Dann eben bthvn ohne mod-dcb und edge-dcb installieren. action="suggest" in ~/platform-complete-bthvn/install.json.
+  Das scheint geklappt zu haben, obowhl der "curl" nicht wieder kommt. 146 Module für bthvn sind aber aktiviert.
+
+  If that fails, remedy the error cause and try again until the post succeeds. 
+
+  Das dauert 90 Sekunden pro Mandant.
 
 Repeat this step for any other tenants (who have enabled platform-complete) on your system.
 
-If that fails, remedy the error cause and try again until the post succeeds. 
 We will take care of old modules that are not needed anymore but are still running (deployed) in the "Clean up" section.
 
-There should now be 131 modules deployed on your single server, try
+       68 Quesnelia-Backend-Module wurden während "deploy=true" für diku hochgefahren. (davon ist mod-dcb herunter gekommen, mod-lists wurde es später hoch gefahren). Es sind aber 71 Backend-Module in Quesnelia. 3 Module sind in Poppy und Quesnelia gleich.
+       68 Backend-Module liefen schon vorher (Poppy + mr-specs). Es waren 67 Backend-Module in Poppy (csp-3).
+There should now be 135 modules deployed on your single server, try
 ```
   docker ps | grep "mod-" | wc
 ```
-65 of those modules belong to the Orchid release, 66 belong to the Poppy release and one module belongs to both releases.
+    135 sollen es sein.
+       Auf folio-hbz5 laufen noch 3 weitere Module, die weder zu Poppy-CSP-3 noch zu Quesnelia-CSP-6 gehören und die nicht benötigt werden (außerdem kommt mod-dcb nicht wieder hoch): 
+       702a1c8cf981   folioorg/mod-agreements:6.1.9 
+       3d274f3c628f   folioorg/mod-licenses:5.0.3
+                      mod-record-specifications:1.0.0-SNAPSHOT.6
 
-Modules enabled for your tenant are now those of the Poppy release:
+64 of those modules belong to the Poppy release only, 68 belong to the Quesnelia release only and three modules belongs to both releases.
+  * nicht neu in Quesnelia (Quesnelia = Poppy Version):
+    mod-z3950:3.3.5
+    mod-graphql:1.12.1
+    mod-kb-ebsco-java-4.0.0
+
+  * nur Quesnelia (neu in Quesnelia):
+    mod-serials-management:1.0.3
+    mod-dcb:1.1.5
+    mod-circulation-item:1.0.0
+    mod-batch-print:1.2.0
+
+Modules enabled for your tenant are now those of the Quesnelia release:
 ```
 curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules | grep id | wc
-  141
+  148  /  146 für bthvn (ohne mod-dcb, edge-dcb)
 ```
 
 This number is the sum of the following:
 
- Poppy release:
+ Poppy CSP-3 Release:
  - 62 Frontend modules
  - 11 Edge modules
  - 67 Backend modules
@@ -660,7 +727,15 @@ This number is the sum of the following:
 
 These are all R2-2023 (Poppy) modules.
 
+ Quesnelia CSP-6 Release:
+ - 64 Frontend modules
+ - 12 Edge modules
+ - 71 Backend modules
+ -  1 Okapi module (5.3.0)
 
+These are all R1-2024 (Quesnelia) modules.
+
+   hier weiter
 ## V. Start the new Frontend
 Stop the old Stripes container: 
 ```
