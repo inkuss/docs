@@ -252,8 +252,11 @@ This manual task is only needed if at least one other tenant stays on Poppy. Thi
 Before migrating a tenant from Poppy to Quesnelia run
 UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '8:cd7cacfe2480c5305d1eaff157a35e4f' WHERE id = 'quartz-init' .
   ERROR:  relation "mod_data_export_spring_quartz.databasechangelog" does not exist
-After the migration run
-UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '9:89aea1286f2c2901835da380fa17eff7' WHERE id = 'quartz-init' .
+  Vielleicht mal so versuchen 
+     su - postgresql
+     psql folio
+     UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '8:cd7cacfe2480c5305d1eaff157a35e4f' WHERE id = 'quartz-init';
+  mod-data-export-spring-3.0.4 blieb aber während und auch nach dem Upgrade oben.
 
 Without the manual task the Poppy version of mod-data-export-spring fails and shuts down on start and restart with 
 "Change failed validation!
@@ -798,7 +801,6 @@ It is now possible to access the system via the UI, again.
 However, changes in permission sets and long-running migration jobs still need to be carried out before the system can be used productively. You will not see the inventory data, yet, because a re-index needs to be done, first.
 
 
-   hier weiter
 ## VI. Cleanup
   
 Clean up. 
@@ -808,10 +810,8 @@ Clean up your docker environment: Remove all stopped containers, all networks no
 ```
 This command might run for some minutes.
 
-Undeploy all unused containers: Delete all modules from Okapi's discovery which are not part of the Poppy release.
-These are 64 modules of the Orchid release -- all but mod-rtac-3.5.0.
-
-Undeploy old module versions like this:
+  Undeploy all unused containers: Delete all modules from Okapi's discovery which are not part of the Quesnelia release.
+  Undeploy old module versions like this:
 ```
 curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-agreements-5.5.2
 curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-audit-2.7.0
@@ -819,24 +819,45 @@ curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-audit-
 curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-z3950-3.3.2
 ```
 
+  Das sind 64 Module von Poppy (alle bis auf 3) sowie auf folio-hbz5 noch diese:
+    mod-agreements-6.1.9
+    mod-licenses-5.0.3
+    curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-record-specifications-1.0.0-SNAPSHOT.6
+
+  Außerdem auf hbz-5 noch diese Edge-Module (aktuellere Quesnelia-Versionen sind installiert):
+     edge-ncip:1.8.1
+     edge-ncip:1.9.2
+     edge-oai-pmh:2.6.1
+     edge-oai-pmh:2.7.2
+     edge-orders:2.8.1
+     edge-orders:2.9.1
+     edge-patron:4.11.0
+     edge-rtac:2.6.0
+
+   mod-record-specifications habe ich manuell gelöscht (s.o.).
+   Ich habe dieses Skript erzeugt und ausgeführt. Es enthält nur (und alle) Poppy-Instanzen, die nicht auch Teil von Quesnelia sind:
+   Alle 74 jetzt noch zu löschenden Module (inkl. edge-Module) stehen in diesem Skript:
+   cd ~/folio-install
+   ./dockerps.todelete.fromPoppy.sh
+
 ### Result
   for Quesnelia CSP#6
-  67 backend modules, "mod-\*" are contained in the list install.json. 
-  Those 67 backend modules are now enabled for your tenant(s). 
-  67 containers for those backend modules are running in docker on your system.
+  71 backend modules, "mod-\*" are contained in the list install.json. 
+  Those 71 backend modules are now enabled for your tenant(s). 
+  71 containers for those backend modules are running in docker on your system.
 
 Now, finally once again get a list of the deployed backend modules:
   
   ```
   curl -w '\n' -D - http://localhost:9130/_/discovery/modules | grep srvcId | grep mod- | wc
- 67
+ 71
   ```
   
 Compare this with the number of your running docker containers:
   
   ```
   docker ps | grep "mod-" | wc
-    67
+    71
   ```
 
 Perform a health check
@@ -845,7 +866,7 @@ Perform a health check
   ```
 Is everything OK ?
   
-Congratulations, your Poppy system is complete and cleaned-up now !
+Congratulations, your Quesnelia system is complete and cleaned-up now !
 
 
 ## VII. Post Upgrade
@@ -853,43 +874,111 @@ Congratulations, your Poppy system is complete and cleaned-up now !
 ### VII.i) From Quesnelia Release notes
 #### 1.) Update MARC-Instance Mapping (Optional)
 After upgrade follow the instructions to update the mapping rules. Change is optional.
-https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1407190/Script+to+update+mapping+rules+with+required+condition+for+specified+fields
+# https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1407190/Script+to+update+mapping+rules+with+required+condition+for+specified+fields
+  Do:
+  cd ~/upgrade
+  java -jar folio-mapping-rules-update-quesnelia.jar folio-mapping-rules-update-quesnelia.configuration.diku.json
+    ...
+    2024-11-27 14:41:27.001  INFO 1138482 --- [           main] o.f.service.UpdateMappingRulesService    : Mapping rules for "classification" field have been successfully updated on the target environment for the following MARC fields: [100, 110, 111]
+    2024-11-27 14:41:27.002  INFO 1138482 --- [           main] org.folio.FolioMappingRulesUpdateApp     : Script execution completed
+  java -jar folio-mapping-rules-update-quesnelia.jar folio-mapping-rules-update-quesnelia.configuration.bthvn.json
 
 #### 2.) Data Import Job Profiles
 Run script to identify Job Profiles that need to be reviewed and corrected.
-https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/168788217
+# https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/168788217
+  Identifiziere "ungültige Assoziationen" :
+  ssh folio@folio-hbz5-dbserver
+  su - postgres
+  cd /usr/folio/upgrade/quesnelia
+  ./data-import-job-profiles.sh diku
+ jobprofileid 
+--------------
+(0 rows)
+  ./data-import-job-profiles.sh bthvn
+ jobprofileid 
+--------------
+(0 rows)
+  - nichts zu tun.
 
 #### 3.) mod-data-export-spring
 This manual task is only needed if at least one other tenant stays on Poppy. This manual task is not needed if all tenants are migrated to Quesnelia at the same time.
-Before migrating a tenant from Poppy to Quesnelia run
-UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '8:cd7cacfe2480c5305d1eaff157a35e4f' WHERE id = 'quartz-init' .
 After the migration run
-UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '9:89aea1286f2c2901835da380fa17eff7' WHERE id = 'quartz-init' .
-
-Without the manual task the Poppy version of mod-data-export-spring fails and shuts down on start and restart with 
-"Change failed validation!
- Error creating bean with name 'quartzSchemaInitializer'
- initial-schema.xml::quartz-init::quartz was: 9:89aea1286f2c2901835da380fa17eff7 but is now: 8:cd7cacfe2480c5305d1eaff157a35e4f"
-
+  su - postgres
+  psql folio
+  UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '9:89aea1286f2c2901835da380fa17eff7' WHERE id = 'quartz-init';
+UPDATE 1
 
 ### VII.ii) Recreate OpenSearch or Elasticsearch index
-Sometimes we need to recreate OpenSearch or Elasticsearch index, for example when a breaking change has been introduced to index structure (mapping). We must re-index after migrating to Poppy. It can be fixed by running reindex request:
 
-  Assure the following permission has been assigned to user diku_admin:
+  Assure the following permission has been assigned to user diku_admin / bthvn_admin:
     search.index.inventory.reindex.post (Search - starts inventory reindex operation)
 
+  Das mit den Token hat sich geändert; hier eine ausführliche Beschreibung:
+  https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1396980/Refresh+Token+Rotation+RTR
+
+  Gucken, dass der User mod-search "aktiv" ist !!
+
   Get a new Token and re-index:
-```
-   export TOKEN=$( curl -s -S -D - -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -H "Accept: application/json" -d '{ "tenant" : "diku", "username" : "diku_admin", "password" : "admin" }' http://localhost:9130/authn/login | grep -i "^x-okapi-token: " )
-  curl -w '\n' -D - -X POST -H "$TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "recreateIndex": true, "resourceName": "instance" }' http://localhost:9130/search/index/inventory/reindex
-```
+     curl -s -S -D - -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -H "Accept: application/json" -d '{ "tenant" : "diku", "username" : "diku_admin", "password" : "admin" }' http://localhost:9130/authn/login-with-expiry
+  Das TOKEN ist der Teil zwischen "Set-Cookie: folioAccessToken=" und dem ersten Semikolon;
+      TOKEN=...
+      curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "recreateIndex": true, "resourceName": "instance" }' http://localhost:9130/search/index/inventory/reindex
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Wed, 27 Nov 2024 16:03:40 GMT
+transfer-encoding: chunked
+
+{"id":"019d70a8-60af-420f-945d-1fab09602895","jobStatus":"In progress","submittedDate":"2024-11-27T16:03:40.879+00:00"}
+
+      ### erst ab Ransoms geht es dann so:
+      ###  curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{"entityTypes": ["instance", "subject", "contributor", "classification"]}' http://localhost:9130/search/index/instance-records/reindex/full
+      ### auch erst ab Ransoms: Wenn das einmal gemacht wurde ("1. Schritt: Datenaggregation/Merge", "2. Schritt: Upload") muss danach nur noch der 2. Schritt aufgerufen werden, das geschieht mit dem Endpoint /upload. Siehe hier: https://github.com/folio-org/mod-search?tab=readme-ov-file#indexing-of-instance-records
+
+  In okapi.log:
+  15:35:55 [] [] [] [] INFO  ?                    042744/search RES 200 3181154us mod-search-3.2.7 http://10.9.2.86:19124/search/index/inventory/reindex
+  ...
+  15:35:56 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4 14:35:56 [042744/search;780402/instance-storage] [diku] [4e3dd2f7-f8de-45d2-bdc6-734084470a42] [mod_inventory_storage] INFO  DomainEventPublisher Producer write queue empty again...
+  15:35:57 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4 14:35:57 [042744/search;780402/instance-storage] [diku] [4e3dd2f7-f8de-45d2-bdc6-734084470a42] [mod_inventory_storage] INFO  DomainEventPublisher Producer write queue full...
+  usw.
+  15:36:13 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4 14:36:13 [] [] [] [] INFO  KafkaConsumerWrapper businessHandlerCompletionHandler:: Consumer - id: 0 subscriptionPattern: SubscriptionDefinition(eventType=instance, subscriptionPattern=quesnelia.\w{1,}.inventory.instance) Committed offset: 42
+  ...
+  das geht bis Committed offset: 224829, alles innerhalb von 60 Sekunden.
+
+  In der Datenbank:
+  select count(*) from diku_mod_inventory_storage.instance;
+ count  
+--------
+ 224829
+(1 row)
+
  ### Monitoring reindex process ( https://github.com/folio-org/mod-search#monitoring-reindex-process )
 
-There is no end-to-end monitoring implemented yet, however it is possible to monitor it partially. In order to check how many records published to Kafka topic use inventory API:
-```
-    curl -w '\n' -D - -X GET -H "$TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/{id}
-```
-Repeat the re-indexing process for other tenants that you might host on your server and have also migrated to Poppy.
+  There is no end-to-end monitoring implemented yet, however it is possible to monitor it partially. In order to check how many records published to Kafka topic use inventory API:
+      curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/{id}
+HTTP/1.1 200 OK
+Content-Type: application/json
+transfer-encoding: chunked
+
+{
+  "id" : "019d70a8-60af-420f-945d-1fab09602895",
+  "published" : 224829,
+  "jobStatus" : "Ids published",
+  "resourceName" : "Instance",
+  "submittedDate" : "2024-11-27T16:03:40.879+00:00"
+}
+
+
+Indexierung wird aber nicht fertig;
+  bricht nach ca. 1/4 bis 1/5 der Sätze (Instanzes, Items) ab. Kann es was hiermit zu tun haben ?
+17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4 16:04:45 [482466/inventory-view] [diku] [cab5e911-727d-455e-b09c-dfeffc49c2a2] [mod_inventory_storage] ERROR PostgresClient       Unrecognized field "staffOnly" (class org.folio.rest.jaxrs.model.HoldingsStatement), not marked as ignorable (3 known properties: "note", "statement", "staffNote"])
+17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4  at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 4169] (through reference chain: org.folio.rest.jaxrs.model.InventoryViewInstance["holdingsRecords"]->java.util.ArrayList[0]->org.folio.rest.jaxrs.model.HoldingsRecord["holdingsStatements"]->java.util.ArrayList[0]->org.folio.rest.jaxrs.model.HoldingsStatement["staffOnly"])
+17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4 com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException: Unrecognized field "staffOnly" (class org.folio.rest.jaxrs.model.HoldingsStatement), not marked as ignorable (3 known properties: "note", "statement", "staffNote"])
+17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4  at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 4169] (through reference chain: org.folio.rest.jaxrs.model.InventoryViewInstance["holdingsRecords"]->java.util.ArrayList[0]->org.folio.rest.jaxrs.model.HoldingsRecord["holdingsStatements"]->java.util.ArrayList[0]->org.folio.rest.jaxrs.model.HoldingsStatement["staffOnly"])
+17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4    at com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException.from(UnrecognizedPropertyException.java:61) ~[mod-inventory-storage-fat.jar:?]
+
+   hier weiter
+
+  Repeat the re-indexing process for other tenants that you might host on your server and have also migrated to Quesnelia.
 
 ### VII.iii) Update permissions
 Update permissions as described in the [Permissions Updates](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105775925/Quesnelia+R1+2024+Permissions+Updates).
