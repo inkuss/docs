@@ -917,6 +917,8 @@ UPDATE 1
   https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1396980/Refresh+Token+Rotation+RTR
 
   Gucken, dass der User mod-search "aktiv" ist !!
+  Mal Kafka aus machen, dann die Indexierung starten
+  sudo su ; cd /opt/kafka-zk ; docker-compose down
 
   Get a new Token and re-index:
      curl -s -S -D - -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -H "Accept: application/json" -d '{ "tenant" : "diku", "username" : "diku_admin", "password" : "admin" }' http://localhost:9130/authn/login-with-expiry
@@ -933,6 +935,9 @@ transfer-encoding: chunked
       ### erst ab Ransoms geht es dann so:
       ###  curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{"entityTypes": ["instance", "subject", "contributor", "classification"]}' http://localhost:9130/search/index/instance-records/reindex/full
       ### auch erst ab Ransoms: Wenn das einmal gemacht wurde ("1. Schritt: Datenaggregation/Merge", "2. Schritt: Upload") muss danach nur noch der 2. Schritt aufgerufen werden, das geschieht mit dem Endpoint /upload. Siehe hier: https://github.com/folio-org/mod-search?tab=readme-ov-file#indexing-of-instance-records
+
+  Jetzt Kafka wieder anschalten:
+    docker-compose up -d
 
   In okapi.log:
   15:35:55 [] [] [] [] INFO  ?                    042744/search RES 200 3181154us mod-search-3.2.7 http://10.9.2.86:19124/search/index/inventory/reindex
@@ -969,16 +974,36 @@ transfer-encoding: chunked
 
 
 Indexierung wird aber nicht fertig;
-  bricht nach ca. 1/4 bis 1/5 der Sätze (Instanzes, Items) ab. Kann es was hiermit zu tun haben ?
+  geht nur bis Instanz 54.687
+  bricht also nach ca. 1/4 bis 1/5 der Sätze (Instanzes, Items) ab. Kann es was hiermit zu tun haben ?
+  wahrscheinlich im 19:28:23 Uhr / 27.11.
 17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4 16:04:45 [482466/inventory-view] [diku] [cab5e911-727d-455e-b09c-dfeffc49c2a2] [mod_inventory_storage] ERROR PostgresClient       Unrecognized field "staffOnly" (class org.folio.rest.jaxrs.model.HoldingsStatement), not marked as ignorable (3 known properties: "note", "statement", "staffNote"])
 17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4  at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 4169] (through reference chain: org.folio.rest.jaxrs.model.InventoryViewInstance["holdingsRecords"]->java.util.ArrayList[0]->org.folio.rest.jaxrs.model.HoldingsRecord["holdingsStatements"]->java.util.ArrayList[0]->org.folio.rest.jaxrs.model.HoldingsStatement["staffOnly"])
 17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4 com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException: Unrecognized field "staffOnly" (class org.folio.rest.jaxrs.model.HoldingsStatement), not marked as ignorable (3 known properties: "note", "statement", "staffNote"])
 17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4  at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 4169] (through reference chain: org.folio.rest.jaxrs.model.InventoryViewInstance["holdingsRecords"]->java.util.ArrayList[0]->org.folio.rest.jaxrs.model.HoldingsRecord["holdingsStatements"]->java.util.ArrayList[0]->org.folio.rest.jaxrs.model.HoldingsStatement["staffOnly"])
 17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4    at com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException.from(UnrecognizedPropertyException.java:61) ~[mod-inventory-storage-fat.jar:?]
 
+   Ursache unbekannt. Der Fehler 'Unrecognized field "staffOnly"' kommt öfters.
+
    hier weiter
 
   Repeat the re-indexing process for other tenants that you might host on your server and have also migrated to Quesnelia.
+
+  curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: bthvn" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/8452b948-fa17-4da8-a500-918918c9e0e5
+HTTP/1.1 200 OK
+Content-Type: application/json
+transfer-encoding: chunked
+
+{
+  "id" : "8452b948-fa17-4da8-a500-918918c9e0e5",
+  "published" : 73964,
+  "jobStatus" : "Ids published",
+  "resourceName" : "Instance",
+  "submittedDate" : "2024-11-27T17:47:17.148+00:00"
+}
+
+Bei bthvn sind die Instanzen im SRS, Indexierung hat funktioniert: 73.928 Sätze.
+  mod-inventory-storage rödelt; mod-dcb müllt auch die Platte voll mit Kafka-Meldungen
 
 ### VII.iii) Update permissions
 Update permissions as described in the [Permissions Updates](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105775925/Quesnelia+R1+2024+Permissions+Updates).
