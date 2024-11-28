@@ -913,30 +913,82 @@ UPDATE 1
   Assure the following permission has been assigned to user diku_admin / bthvn_admin:
     search.index.inventory.reindex.post (Search - starts inventory reindex operation)
 
-  Das mit den Token hat sich geändert; hier eine ausführliche Beschreibung:
-  https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1396980/Refresh+Token+Rotation+RTR
+   28.11.2024
+   Julian: Das Feld 'staffOnly' gibt es im Holdings-Statement nicht.
+   Das Feld in der Datenbank durch 'staffNote' ersetzen:
+   sudo su ; su - postgres ; psql folio
+   Wie sieht jsonb aus ?
+   SELECT jsonb from diku_mod_inventory_storage.holdings_record ;
+   {"id": "05cd36a2-9299-502e-9229-a2ba17889555", "hrid": "10090481", "notes": [], "_version": 9, "metadata": {"createdDate": "2022-01-31T18:27:50.023", "updatedDate": "2022-01-31T18:27:50.023+00:00", "createdByUserId": "4e3dd2f7-f8de-45d2-bdc6-734084470a42", "updatedByUserId": "4e3dd2f7-f8de-45d2-bdc6-734084470a42"}, "formerIds": [], "instanceId": "0ec90c62-96d9-5e0b-8f08-e69a742920a1", "electronicAccess": [], "holdingsStatements": [], "statisticalCodeIds": [], "effectiveLocationId": "36613e1b-44c0-4ffc-9b00-26daac18d922", "permanentLocationId": "36613e1b-44c0-4ffc-9b00-26daac18d922", "holdingsStatementsForIndexes": [], "holdingsStatementsForSupplements": []}
+      ...
+   Wie viele komische Sätze gibt es ?
+   SELECT count(*) from diku_mod_inventory_storage.holdings_record where jsonb->'holdingsStatements'->0->'staffOnly' = 'true'; 
+-------
+ 17318
+(1 row
+   SELECT jsonb->'holdingsStatements',jsonb->'hrid',jsonb->'instanceId' from diku_mod_inventory_storage.holdings_record where jsonb->'holdingsStatements'->0->'staffOnly' = 'true';
+   komische Sätze:
+   [{"note": "MusHeh9 Zimmermann", "staffOnly": true, "statement": "Bestandsangabe=Freihandsignatur"}]         | "10091771"      | "b6f54e4a-e1f0-5614-9c33-37c8c5ba3993"
+   [{"note": "FilAI", "staffOnly": true, "statement": "Bestandsangabe=Freihandsignatur"}]                      | "10092009"      | "8ae034ff-8acc-5d7d-b0f3-e2d4a2181884"
+   [{"note": "HisG 32", "staffOnly": true, "statement": "Bestandsangabe=Freihandsignatur"}]                    | "10092523"      | "97952b8c-b1a9-5eff-8b93-bb2c1e3bbecc"
+   [{"note": "MusHeg9 Grieg, Edv72", "staffOnly": true, "statement": "Bestandsangabe=Freihandsignatur"}]       | "10095786"      | "6e2a029e-815a-5e1e-bf62-b217a28fdb8a"
+     ...
+
+  Das hier fügt das Feld "staffNote" zu einem einzelnen Satz hinzu: (Quelle: https://stackoverflow.com/questions/18209625/how-do-i-modify-fields-inside-the-new-postgresql-json-datatype)
+    (offizielle Quelle [zu kompliziert, keine Beispiele]: https://www.postgresql.org/docs/9.5/functions-array.html)
+     UPDATE diku_mod_inventory_storage.holdings_record  SET jsonb = jsonb_insert(jsonb, '{holdingsStatements,0,staffNote}', 'true'::jsonb) WHERE jsonb->'hrid' = '"10091771"';
+     SELECT jsonb from diku_mod_inventory_storage.holdings_record where jsonb->'hrid' = '"10091771"';
+  Und so entfernt man das Feld "staffOnly" aus einem einzelnen Satz:
+     UPDATE diku_mod_inventory_storage.holdings_record  SET jsonb = jsonb #- '{holdingsStatements,0,staffOnly}' WHERE jsonb->'hrid' = '"10091771"';
+   Und so für alle "falschen" Bestandsdaten machen:
+   ===============================================
+     UPDATE diku_mod_inventory_storage.holdings_record  SET jsonb = jsonb_insert(jsonb, '{holdingsStatements,0,staffNote}', 'true'::jsonb) WHERE jsonb->'holdingsStatements'->0->'staffOnly' = 'true';
+     UPDATE 17317
+     UPDATE diku_mod_inventory_storage.holdings_record  SET jsonb = jsonb #- '{holdingsStatements,0,staffOnly}' WHERE jsonb->'holdingsStatements'->0->'staffOnly' = 'true';
+     UPDATE 17317
+
+  Statt  { "note": "MusHeh9 Zimmermann", "staffNote": true } muss es aber heißen { "staffNote": "MusHeh9 Zimmermann" }, wenn alles interne Anmerkungen sein sollen. S. z.B. "Edvard Grieg: Eine Biographie ; Reclam" .
 
   Gucken, dass der User mod-search "aktiv" ist !!
   Mal Kafka aus machen, dann die Indexierung starten
   sudo su ; cd /opt/kafka-zk ; docker-compose down
 
+  Das mit den Token hat sich geändert; hier eine ausführliche Beschreibung:
+  https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1396980/Refresh+Token+Rotation+RTR
   Get a new Token and re-index:
      curl -s -S -D - -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -H "Accept: application/json" -d '{ "tenant" : "diku", "username" : "diku_admin", "password" : "admin" }' http://localhost:9130/authn/login-with-expiry
   Das TOKEN ist der Teil zwischen "Set-Cookie: folioAccessToken=" und dem ersten Semikolon;
-      TOKEN=...
+      export TOKEN=...
       curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "recreateIndex": true, "resourceName": "instance" }' http://localhost:9130/search/index/inventory/reindex
 HTTP/1.1 200 OK
 Content-Type: application/json
-Date: Wed, 27 Nov 2024 16:03:40 GMT
+Date: Thu, 28 Nov 2024 14:59:47 GMT
 transfer-encoding: chunked
 
-{"id":"019d70a8-60af-420f-945d-1fab09602895","jobStatus":"In progress","submittedDate":"2024-11-27T16:03:40.879+00:00"}
+{"id":"27880e11-73a0-4447-94a7-88b6d62f9e2a","jobStatus":"In progress","submittedDate":"2024-11-28T14:59:47.551+00:00"}
 
       ### erst ab Ransoms geht es dann so:
       ###  curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{"entityTypes": ["instance", "subject", "contributor", "classification"]}' http://localhost:9130/search/index/instance-records/reindex/full
       ### auch erst ab Ransoms: Wenn das einmal gemacht wurde ("1. Schritt: Datenaggregation/Merge", "2. Schritt: Upload") muss danach nur noch der 2. Schritt aufgerufen werden, das geschieht mit dem Endpoint /upload. Siehe hier: https://github.com/folio-org/mod-search?tab=readme-ov-file#indexing-of-instance-records
 
-  Jetzt Kafka wieder anschalten:
+ ### Monitoring reindex process ( https://github.com/folio-org/mod-search#monitoring-reindex-process )
+
+  There is no end-to-end monitoring implemented yet, however it is possible to monitor it partially. In order to check how many records published to Kafka topic use inventory API:
+      curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/{id}
+HTTP/1.1 200 OK
+Content-Type: application/json
+transfer-encoding: chunked
+
+{
+  "id" : "27880e11-73a0-4447-94a7-88b6d62f9e2a",
+  "published" : 30000,
+  "jobStatus" : "In progress",
+  "resourceName" : "Instance",
+  "submittedDate" : "2024-11-28T14:59:47.551+00:00"
+}
+
+  das okapi.log sowie das log von mod-search (muss nicht) und mod-inventory-storage beobachten.
+  Jetzt Kafka wieder anschalten (solange Kafka nicht an ist, wird nichts indexiert):
     docker-compose up -d
 
   In okapi.log:
@@ -955,43 +1007,33 @@ transfer-encoding: chunked
 --------
  224829
 (1 row)
-
- ### Monitoring reindex process ( https://github.com/folio-org/mod-search#monitoring-reindex-process )
-
-  There is no end-to-end monitoring implemented yet, however it is possible to monitor it partially. In order to check how many records published to Kafka topic use inventory API:
-      curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/{id}
+ 
+  Job Status geht innerhalb 1 Minute auf "Ids Published" :
+  curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/27880e11-73a0-4447-94a7-88b6d62f9e2a
 HTTP/1.1 200 OK
 Content-Type: application/json
 transfer-encoding: chunked
 
 {
-  "id" : "019d70a8-60af-420f-945d-1fab09602895",
-  "published" : 224829,
+  "id" : "27880e11-73a0-4447-94a7-88b6d62f9e2a",
+  "published" : 224825,
   "jobStatus" : "Ids published",
   "resourceName" : "Instance",
-  "submittedDate" : "2024-11-27T16:03:40.879+00:00"
+  "submittedDate" : "2024-11-28T14:59:47.551+00:00"
 }
 
 
-Indexierung wird aber nicht fertig;
-  geht nur bis Instanz 54.687
-  bricht also nach ca. 1/4 bis 1/5 der Sätze (Instanzes, Items) ab. Kann es was hiermit zu tun haben ?
-  wahrscheinlich im 19:28:23 Uhr / 27.11.
-17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4 16:04:45 [482466/inventory-view] [diku] [cab5e911-727d-455e-b09c-dfeffc49c2a2] [mod_inventory_storage] ERROR PostgresClient       Unrecognized field "staffOnly" (class org.folio.rest.jaxrs.model.HoldingsStatement), not marked as ignorable (3 known properties: "note", "statement", "staffNote"])
-17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4  at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 4169] (through reference chain: org.folio.rest.jaxrs.model.InventoryViewInstance["holdingsRecords"]->java.util.ArrayList[0]->org.folio.rest.jaxrs.model.HoldingsRecord["holdingsStatements"]->java.util.ArrayList[0]->org.folio.rest.jaxrs.model.HoldingsStatement["staffOnly"])
-17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4 com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException: Unrecognized field "staffOnly" (class org.folio.rest.jaxrs.model.HoldingsStatement), not marked as ignorable (3 known properties: "note", "statement", "staffNote"])
-17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4  at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 4169] (through reference chain: org.folio.rest.jaxrs.model.InventoryViewInstance["holdingsRecords"]->java.util.ArrayList[0]->org.folio.rest.jaxrs.model.HoldingsRecord["holdingsStatements"]->java.util.ArrayList[0]->org.folio.rest.jaxrs.model.HoldingsStatement["staffOnly"])
-17:04:46 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4    at com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException.from(UnrecognizedPropertyException.java:61) ~[mod-inventory-storage-fat.jar:?]
-
-   Ursache unbekannt. Der Fehler 'Unrecognized field "staffOnly"' kommt öfters.
-
-   hier weiter
+  Indexierung wird ferig in 50 Minuten.
+  mod-search hört nun auf zu rödeln,
+  15:51:16 [] [diku] [cab5e911-727d-455e-b09c-dfeffc49c2a2] [mod-search] INFO  ResourceService      Records indexed to elasticsearch [indexRequests: 25, removeRequests: 0]
+  mod-inventory-storage ebenfalls.
 
   Repeat the re-indexing process for other tenants that you might host on your server and have also migrated to Quesnelia.
 
-  curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: bthvn" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/8452b948-fa17-4da8-a500-918918c9e0e5
+  curl -w '\n' -D - -X GET -10091771"H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: bthvn" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/8452b948-fa17-4da8-a500-918918c9e0e5
 HTTP/1.1 200 OK
 Content-Type: application/json
+
 transfer-encoding: chunked
 
 {
@@ -1006,8 +1048,9 @@ Bei bthvn sind die Instanzen im SRS, Indexierung hat funktioniert: 73.928 Sätze
   mod-inventory-storage rödelt; mod-dcb müllt auch die Platte voll mit Kafka-Meldungen
 
 ### VII.iii) Update permissions
-Update permissions as described in the [Permissions Updates](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105775925/Quesnelia+R1+2024+Permissions+Updates).
+  Update permissions as described in the [Permissions Updates](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105775925/Quesnelia+R1+2024+Permissions+Updates).
 
+   hier weiter
 ### VII.iv) Manual Tests
 - Login to the frontend, user=diku_admin, passwd=admin
 - Delete browser cache (this is important, otherwise you will see the old frontend modules)
@@ -1015,7 +1058,11 @@ Update permissions as described in the [Permissions Updates](https://folio-org.a
     check against "incompatible interface versions". There should be none.
     check if "Quesnelia CSP-6" is being displayed on the settings page
 - check if circulation log can be downloaded (this checks if mod-data-export-worker works)
-- check if emails are being sent (do a checkout for a test user)
+     Test-User auf folio-hbz5 : 2345 => geht nicht ; kommt nicht in minio an.
+        [mod-data-export-worker] ERROR tepExecutionListener Can't find mod-data-export-worker/bulk_edit/CIRCULATION_LOG_2024-11-28_16:12:54_a2140656-e5b5-47b3-9241-65553e2712d1_0.tmp
+- check if emails are being sent
+   - do a checkout for a test user: 2345 leiht Item 9876 aus. => kommt email "erfolgreiche Ausleihe" von noreply@folio-hbz5 .
+   - Email "Reset your Folio account" für User 2345 erhalten (geschenkt)
 
 
 Congratulation, your system is ready!
