@@ -1050,7 +1050,6 @@ Bei bthvn sind die Instanzen im SRS, Indexierung hat funktioniert: 73.928 Sätze
 ### VII.iii) Update permissions
   Update permissions as described in the [Permissions Updates](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105775925/Quesnelia+R1+2024+Permissions+Updates).
 
-   hier weiter
 ### VII.iv) Manual Tests
 - Login to the frontend, user=diku_admin, passwd=admin
 - Delete browser cache (this is important, otherwise you will see the old frontend modules)
@@ -1058,8 +1057,7 @@ Bei bthvn sind die Instanzen im SRS, Indexierung hat funktioniert: 73.928 Sätze
     check against "incompatible interface versions". There should be none.
     check if "Quesnelia CSP-6" is being displayed on the settings page
 - check if circulation log can be downloaded (this checks if mod-data-export-worker works)
-     Test-User auf folio-hbz5 : 2345 => geht nicht ; kommt nicht in minio an.
-        [mod-data-export-worker] ERROR tepExecutionListener Can't find mod-data-export-worker/bulk_edit/CIRCULATION_LOG_2024-11-28_16:12:54_a2140656-e5b5-47b3-9241-65553e2712d1_0.tmp
+     Test-User auf folio-hbz5 : 2345 => geht . Circulation Log kommt in minio an und wird im Browser zur Darstellung angeboten.
 - check if emails are being sent
    - do a checkout for a test user: 2345 leiht Item 9876 aus. => kommt email "erfolgreiche Ausleihe" von noreply@folio-hbz5 .
    - Email "Reset your Folio account" für User 2345 erhalten (geschenkt)
