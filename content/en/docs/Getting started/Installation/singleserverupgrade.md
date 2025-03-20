@@ -30,7 +30,7 @@ This is a documentation for an **upgrade** of your FOLIO system.
 | **System Type**                     | **Version referred to in this manual**     |
 |-------------------------------------|--------------------------------------------|
 | Operating system                    | Ubuntu 22.04.2 LTS 64-bits                 |
-| FOLIO system to migrate from        | Poppy CSP#5 (R2-2023-CSP-5)               |
+| FOLIO system to migrate from        | Poppy CSP#6 (R2-2023-CSP-6)               |
 
 
 **Hardware requirements**
@@ -44,24 +44,24 @@ This is a documentation for an **upgrade** of your FOLIO system.
 ## I. Before the Upgrade
 
 ### I.i) Ubuntu Upgrade
-First do Ubuntu Updates & Upgrades. Das auch auf dem Datenbankserver machen.
+Erst Ubuntu Updates & Upgrades machen. Das auch auf dem Datenbankserver machen.
 Den Reboot des DB-Servers erst machen, wenn der "normale" Server wieder hoch gekommen ist und alle Container wieder laufen !  
 ```
 sudo apt update
 sudo apt upgrade
 sudo reboot
 ```
-Check if all Services have been restarted after reboot: <em>Okapi, postgres, docker, the docker containers</em> (do: docker ps --all | more ) <em>, Stripes and nginx.</em>
+Prüfe, ob alle Dienste nach dem Reboot neu gestartet wurden: <em>Okapi, postgres, docker, the docker containers</em> (do: docker ps --all | more ) <em>, Stripes and nginx.</em>
 
-These are the official [Quesnelia Important Upgrade Considerations](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105775773/Quesnelia+R1+2024+Important+upgrade+considerations)
-Do these actions before the upgrade:
+Dies sind die offiziellen [Quesnelia wichtige Upgrade-Erwägungen](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105775773/Quesnelia+R1+2024+Important+upgrade+considerations)
+Mach das hier vor dem Upgrade:
 
 
 ### I.ii) From Quesnelia Release Notes:
 #### 1.) Postgres Upgrade
-Migrate from PostgreSQL 12 to a more recent version by November 14, 2024.
+Migriere bis zum 14. November 2024 von PostgreSQL 12 auf eine neuere Version.
 PostgreSQL 12 will reach end of life (no security fixes!) on November 14, 2024.
-FOLIO officially supports PostgreSQL 16 from Quesnelia on.
+FOLIO unterstützt von Quesnelia an offiziell PostgreSQL 16.
 These are the high-level steps for moving your data to a new PostgreSQL database with a higher major version:
 
     - das System vom Netz nehmen (auf folio-proxy)
@@ -74,23 +74,22 @@ These are the high-level steps for moving your data to a new PostgreSQL database
     2. Ein Backup der Datenbank machen.
     ***************************************
     # Vielleicht hier nach vorgehen: https://codebeamer.com/cb/wiki/17817868
-    # Dump all roles on the source database
     mkdir ~/dbupgrade # auf dem DB-Server
     cd $HOME/dbupgrade
     pg_dumpall -g > roles.postgres12.psql
     # Dump databases
     pg_dump okapi > okapi.postgres12.psql
-    pg_dump folio > folio.postgres12.psql  (1,6 GB auf wdr-test)
+    pg_dump folio > folio.postgres12.psql  (1,6 GB auf wdr und wdr-test)
 
     - Exkurs: nur die Tabellen eines bestimmten Schemas dumpen:
       # -c = "clean" ; das ist (nur) sinnvoll, wenn man bestehende Datenbanken überschreiben will (hier gibt es aber keine)
       # pg_dump -U folio -cv --schema=diku_mod_circulation_storage -f folio.diku_mod_circulation_storage-create.sql --dbname=folio
       # pg_dump -U folio -v --schema=diku_mod_circulation_storage -f folio.diku_mod_circulation_storage.sql --dbname=folio
 
-    3. Create a new database with the desired version.
-    ***********************************************
+    3. Erzeuge eine neue Datenbank der gewünschten Version
+    *******************************************************
     # Vielleicht hier nach vorgehen: https://www.linuxbuzz.com/how-to-install-postgresql-on-ubuntu/
-      # Install prerequisites
+      # Installiere Voraussetzungen auf dem Datenbankserver:
       sudo apt update
       sudo apt install  gpgv gpgsm gnupg-l10n gnupg dirmngr wget vim -y
       # Import the PostgreSQL signing key, add the PostgreSQL apt repository and install PostgreSQL.
@@ -106,6 +105,55 @@ These are the high-level steps for moving your data to a new PostgreSQL database
     # Configure PostgreSQL to listen on all interfaces and allow connections from all addresses (to allow Docker connections).
 
     cd  /etc/postgresql/16/main
+        Das Verzeichnis wurde nicht angelegt.
+        ( /usr/lib/postgresql/16 wurde auch nicht angelegt. )
+        /var/lib/postgresql/16 wurde angelegt.
+        Ich kopiere jetzt einfach
+        /etc/postgresql/16  von folio-hbz4-dbserver herüber.
+        danach chown -R postgres:postgres auf dieses Verzeichnis.
+        Außerdem:
+        # mkdir /var/lib/postgresql/16
+        # mkdir /var/lib/postgresql/16/main
+        # chown postgres:postgres /var/lib/postgresql/16
+        # chown postgres:postgres /var/lib/postgresql/16/main
+        # Dann PG_VERSION  postmaster.opts  in /var/lib/postgresql/16/main  von folio-hbz4-dbserver herüber kopieren.
+          Erzeuge ein Ziel-Cluster (Quelle: https://dba.stackexchange.com/questions/330373/how-can-i-cleanly-recreate-the-main-postgresql-cluster)
+          sudo systemctl daemon-reload
+          sudo -u postgres pg_createcluster 16 main
+             Creating new PostgreSQL cluster 16/main ... 
+             /usr/lib/postgresql/16/bin/initdb -D /var/lib/postgresql/16/main --auth-local peer --auth-host scram-sha-256 --no-instructions
+             The files belonging to this database system will be owned by user "postgres".
+             This user must also own the server process.
+
+             The database cluster will be initialized with this locale configuration:
+               provider:    libc
+               LC_COLLATE:  de_DE.UTF-8
+               LC_CTYPE:    de_DE.UTF-8
+               LC_MESSAGES: C
+               LC_MONETARY: de_DE.UTF-8
+               LC_NUMERIC:  de_DE.UTF-8
+               LC_TIME:     de_DE.UTF-8
+             The default database encoding has accordingly been set to "UTF8".
+             The default text search configuration will be set to "german".
+             
+             Data page checksums are disabled.
+             
+             fixing permissions on existing directory /var/lib/postgresql/16/main ... ok
+             creating subdirectories ... ok
+             selecting dynamic shared memory implementation ... posix
+             selecting default max_connections ... 100
+             selecting default shared_buffers ... 128MB
+             selecting default time zone ... Europe/Berlin
+             creating configuration files ... ok
+             running bootstrap script ... ok
+             performing post-bootstrap initialization ... ok
+             syncing data to disk ... ok
+             Warning: systemd does not know about the new cluster yet. Operations like "service postgresql start" will not handle it. To fix, run:
+               sudo systemctl daemon-reload
+             Ver Cluster Port Status Owner    Data directory              Log file
+             16  main    5433 down   postgres /var/lib/postgresql/16/main /var/log/postgresql/postgresql-16-main.log
+        sudo systemctl daemon-reload
+
     Edit (via sudo) the file /etc/postgresql/16/main/postgresql.conf 
       add line listen_addresses = '*' in the "Connection Settings" section.
       In the same file, increase max_connections = 1200
@@ -138,7 +186,12 @@ These are the high-level steps for moving your data to a new PostgreSQL database
     systemctl stop postgresql
     cd /usr/folio/dbupgrade (das Verzeichnis muss postgres:postgres gehören)
     su - postgres
-    ./ks.upgrade.sh # erst mit --check laufen lassen, dann ohne
+    ./ks.upgrade.sh # erst mit --check laufen lassen
+     Checking for new cluster tablespace directories               ok
+     *Clusters are compatible*, ...
+    dann ohne check laufen lassen:
+    ./ks.upgrade.sh
+
     # logfiles sind in /var/lib/postgresql/16/main/pg_upgrade_output.d
     Der Upgrade war erfolgreich:
     Your installation contains extensions that should be updated
@@ -173,18 +226,25 @@ Running this script will delete the old cluster's data files:
       ./delete_old_cluster.sh # das entfernt /var/lib/postgresql/12/main
 
     ODER (nicht gemacht)
+          *************
     cd ~/dbupgrade
     # einspielen der Dumps (nicht gemacht)
     Run VACUUM ANALYZE; command to reorganize PostgreSQL indices. For better performance, it can be started parallel using the following command: VACUUM (PARALLEL 4, ANALYZE); where 4 is the number of allocated processors in server.
 
-    - Crontab für root installieren. Das Log von mod-quick-marc periodisch löschen (wie auf folio-hbz5)
+    - Crontab für root installieren. Das Log von mod-quick-marc periodisch löschen (wie auf folio-hbz4)
     - Okapi restart
-      ssh folio@folio-hbz4 ; sudo su ; systemctl start okapi.service ; das okapi-log verfolgen
+      [ bis hierher auf folio-hbz3 90 Minuten gebraucht (postgres 16 ließ sich nicht installieren)]
+      systemctl start okapi.service ; das okapi-log verfolgen
+      Warten, bis alle Backend-Module wieder oben sind:
+      docker ps | grep "mod-" | wc
+  67
     - das System wieder ans Netz bringen
        testen aller Mandanten; sind User- und Katalogdaten verfügbar ? Ja
+         - es dauert eine Weile (10 Minuten), bis man sich wieder einloggen kann !
 
 #### 2.) mod-data-export-spring
-This manual task is only needed if at least one other tenant stays on Poppy. This manual task is not needed if all tenants are migrated to Quesnelia at the same time. ==> auf wdr-test nicht gemacht.
+Auf wdr und wdr-test nicht gemacht.
+This manual task is only needed if at least one other tenant stays on Poppy. This manual task is not needed if all tenants are migrated to Quesnelia at the same time.
 Before migrating a tenant from Poppy to Quesnelia run
 UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '8:cd7cacfe2480c5305d1eaff157a35e4f' WHERE id = 'quartz-init' .
   ERROR:  relation "mod_data_export_spring_quartz.databasechangelog" does not exist
@@ -199,18 +259,18 @@ Without the manual task the Poppy version of mod-data-export-spring fails and sh
  Error creating bean with name 'quartzSchemaInitializer'
  initial-schema.xml::quartz-init::quartz was: 9:89aea1286f2c2901835da380fa17eff7 but is now: 8:cd7cacfe2480c5305d1eaff157a35e4f"
 
-### More preparatory steps
+### Weitere vorbereitende Schritte
 There might be more preparatory steps that you need to take into account for your installation. If you are unsure what other steps you might need to take, study carefully the Release Notes.  Do all actions in the column "Action required", as appropriate for your installation.
 
 
-## II. Upgrade Okapi and Prepare Backend Upgrade
+## II. Upgrade Okapi und Vorebereitung des Werkstattmodul-Upgrades
 ### II.i) Fetch a new version of platform-complete
 Fetch the new release version of platform-complete, change into that directory: 
 ```
 cd platform-complete
 git fetch
 ```
-There is a branch R1-2024-csp-8 (released on 07. Jan 2025). We will deploy this version.
+Es gibt einen Zweig R1-2024-csp-9. Den installieren wir.
 Check out this Branch.
 Stash local changes. This should only pertain to stripes.config.js .
 Discard any changes which you might have made on the install-jsons:
@@ -224,16 +284,16 @@ git restore package.json
 git stash save
 git checkout master
 git pull
-git checkout R1-2024-csp-8 (out 7. Januar 2025)
+git checkout R1-2024-csp-9 (vom 30. Januar 2025)
 git stash pop
 ```
 Den Zusammenführungs-Konflikt in stripes.config.js beheben.
 
 ### II.ii) Upgrade Okapi
-Upgrade the Okapi version and restart Okapi.
-Read the Quesnelia Okapi version from install.json: **okapi-5.3.0**
+Die Okapi-Version hochziehen und Okapi neu starten.
+Die Quesnelia-Okapi-Version aus install.json: **okapi-5.3.0**
 
-Build Okapi from source
+Baue Okapi aus den Quelldateien
 ```
   cd /usr/folio/okapi
   git fetch
@@ -243,23 +303,24 @@ Build Okapi from source
     [INFO] BUILD SUCCESS
 ```
 
-Restart Okapi
+Neustart Okapi
 ```
   sudo systemctl restart okapi
 ```
 
-Follow /var/log/folio/okapi/okapi.log . 
+Folge /var/log/folio/okapi/okapi.log . 
 
-Now Okapi will re-start your modules. Follow the okapi.log. It will run for 5 minutes or so until all modules are up again. Check if all modules are running:
+Okapi startet die Module neu. Verfolge das okapi.log. Okapi wird 5 Minuten oder so benötigen, bis alle Module wieder oben sind. Überprüfe, ob alle Module laufen:
 
 ```
 docker ps | grep "mod-" | wc
   67
 ```
-The above number applies if you had installed a complete platform of Orchid, previously.
+Diese Zahl bezieht sich auf eine Vollinstallation von Poppy.
   folio-hbz4: es sind sogar 69. mod-remote-storage und mod-service-interaction laufen in je 2 Versionen.
+  folio-hbz4: es sind 70. Geht dann auf 68 zurück (2 stürzen ab).
 
-Retrieve the list of modules which are now being enabled for your tenant (just for your information):
+Hole dir die Liste von Modulen, die jetzt für deinen Mandanten aktiviert sind (rein zur Information):
 
 ```
 curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/wdr/modules
@@ -269,28 +330,27 @@ curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/wdr/modules
 } ]
 ```
 
-If you are starting with a complete platform of Poppy, you will see 11 Edge modules, 62 Frontend modules (folio_\*), 67 Backend modules (mod-\*) and the Quesnelia version of Okapi (5.3.0).
+Eine vollständige Plattform von Poppy hat 11 Kanten-Module, 62 Schaufenstermodule (folio_\*), und 67 Werkstattmodule (mod-\*), sowie die Quesnelia-version des Portals Okapi (5.3.0).
 
 
-### II.iii) Pull module descriptors from the central registry
+### II.iii) Ziehe die Moduldeskriptorem aus der zentralen Registrierung
 
 A module descriptor declares the basic module metadata (id, name, etc.), specifies the module's dependencies on other modules (interface identifiers to be precise), and reports all "provided" interfaces. As part of the continuous integration process, each module descriptor is published to the FOLIO Registry at https://folio-registry.dev.folio.org.
 
 ```
-curl -w '\n' -D - -X POST -H "Content-type: application/json" \
-  -d '{ "urls": [ "https://folio-registry.dev.folio.org" ]  }' http://localhost:9130/_/proxy/pull/modules
+curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '{ "urls": [ "https://folio-registry.dev.folio.org" ]  }' http://localhost:9130/_/proxy/pull/modules
 ```
-Okapi log should show something like
+Im Okapi-Log sieht man dann etwas wie:
 
 ```
- INFO  ProxyContent         759951/proxy REQ 127.0.0.1:58954 supertenant POST /_/proxy/pull/modules okapi-5.3.0
- INFO  PullManager          Remote registry at https://folio-registry.dev.folio.org is version 5.3.0
+ INFO  ProxyContent         265532/proxy REQ 127.0.0.1:60014 supertenant POST /_/proxy/pull/modules okapi-5.3.0
+ INFO  PullManager          Remote registry at https://folio-registry.dev.folio.org is version 5.0.1
  INFO  PullManager          pull smart
- INFO  PullManager          pull: 3063 MDs to insert
- INFO  ProxyContent         895575/proxy RES 200 10228989us okapi-5.3.0 /_/proxy/pull/modules
+ INFO  PullManager          pull: 2893 MDs to insert
+ INFO  ProxyContent         265532/proxy REQ 127.0.0.1:60014 supertenant POST /_/proxy/pull/modules okapi-5.3.0
 ```
 
-### II.iv) Configure Module Environment Variables
+### II.iv) Konfiguriere die Umgebungsvariablen der Module
 This part is the one in which a system operator needs to take the most care and will probably spend the most time on.
 
 Check your Okapi environment:
@@ -299,7 +359,7 @@ Check your Okapi environment:
  curl -X GET http://localhost:9130/_/env
 ```
 
-At this point, (re-)configure the environment variables of your modules, as needed.
+In der Folge, re-konfiguriere die Umgebungsvariablen so wie benötigt.
 Study the release notes for any changes in module configurations.
 Follow these instructions to change the environment variables for a module: [Change Environment Variables of a Module](https://wiki.folio.org/display/SYSOPS/Change+Environment+Variables+of+a+Module).
 
@@ -334,20 +394,20 @@ Set DB_CONNECTION_TIMEOUT to at least 250, otherwise mod-entities-links will fai
 #### ii. Incompatible Hazelcast version in mod-remote-storage
 During the upgrade, the Poppy and Quesnelia versions of mod-remote-storage will run in parallel. This will only work if they are on different Hazelcast clusters. Set the Hazelcast cluster name for the Quesnelia version to "quesnelia":
 ```
-  # Configure mod-remote-storage-3.2.0 (Quesnelia version)
+  # Konfiguriere mod-remote-storage-3.2.0 (Quesnelia-Version)
   cd ~/folio-install
-  # 1. Copy the module descriptor into a file
+  # 1. Kopiere den Moduldeskriptor in eine Datei
   curl -w '\n' -D -  http://localhost:9130/_/proxy/modules/mod-remote-storage-3.2.0 > mod-remote-storage-3.2.0-module-descriptor.json
-  # 2. Add env var in launch descriptor manually :
+  # 2. Füge im Hochfahr-Deskriptor manuell eine Umgebungsvariable hinzu:
       "name" : "HZ_CLUSTERNAME", "value" : "quesnelia"
-  # 3. Delete the module descriptor
+  # 3. Lösche den bisherigen Moduldeskriptor:
   curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-remote-storage-3.2.0
-  # 4. Send the new module descriptor to /_/proxy/modules
+  # 4. Sende den neuen Moduldeskriptor an /_/proxy/modules
    curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-remote-storage-3.2.0-module-descriptor.json http://localhost:9130/_/proxy/modules
 ```
 
 #### iii. OAI-PMH (mod-oai-pmh) configuration.
-Of course you only need to do this if you want to _utilize_ the oai-pmh interface of your (test or demo FOLIO) instance.
+Das muss man natürlich nur machen, wenn man die OAI-Schnittstelle auch tatsächlich benutzen will.
 For stable operation, mod-oai-pmh  requires the following memory configuration: 
   Editiere mod-oai-pmh-3.13.2-module-descriptor.json
 ```
@@ -360,7 +420,7 @@ JAVA_OPTIONS: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx1440m
 ```
 
 #### iv. S3 storage compatible environment variables
-Some modules make use of an S3 storage or compatible (AWS-S3 or minion server) persistent storage. 
+Einige Module benutzen S3-kompatiblen persistenten Speicher (AWS-S3 oder Minion-Server).
 mod-data-export-worker has been using it since some releases ago.
 Modules that now also make use of it are:
   mod-bulk-operations,
@@ -382,12 +442,12 @@ Modules that now also make use of it are:
   curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_FILES_MAX_POOLSIZE\",\"value\":\"10\"}" http://localhost:9130/_/env
 
 #### v. Set jwt.signing.key for mod-authtoken
-In the launch descriptor of mod-authtoken-2.15.2, set jwt.signing.key in the JAVA_OPTION to the same value as you have set it in the Poppy version of mod-authtoken(-2.14.1) :
+Im Hochfahr-Deskriptor von mod-authtoken-2.15.2, setze jwt.signing.key in der JAVA_OPTION auf den gleichen Wert, wie du ihn in der vorhergehenden Version (Poppy, mod-authtoken-2.14.1) gesetzt hast:
 Set expiration seconds for expiring tokens (set LEGACY_TOKEN_TENANTS="*" if you do not want to utilize expiring tokens):
 ```
     "env" : [ {
       "name" : "JAVA_OPTIONS",
-      "value" : "-XX:MaxRAMPercentage=66.0 -Dcache.permissions=true -Dallow.cross.tenant.requests=true -Djwt.signing.key=folio-hbz4-wdr"
+      "value" : "-XX:MaxRAMPercentage=66.0 -Dcache.permissions=true -Dallow.cross.tenant.requests=true -Djwt.signing.key=folio-hbz3-wdr"
     }, {
       "name" : "LEGACY_TOKEN_TENANTS",
       "value" : ""
@@ -409,7 +469,7 @@ Set other CONSUMER_PATTERNS in the module descriptor, as well.
 Set SEARCH_BY_ALL_FIELDS_ENABLED to "true" if you want to activate the search option "all" (search in all fields). By default, SEARCH_BY_ALL_FIELDS_ENABLED is set to "false".
 
 #### vii. mod-agreements
-Increase "Memory" in the Launch Descriptor of mod-agreements-7.0.9 to 8 GB, if you want to connect FOLIO to GOKB.
+Increase "Memory" in the Launch Descriptor of mod-agreements-7.0.10 to 8 GB, if you want to connect FOLIO to GOKB.
 ```
   "dockerArgs" : {
       "HostConfig" : {
@@ -432,7 +492,7 @@ Increase "Memory" in the Launch Descriptor of mod-agreements-7.0.9 to 8 GB, if y
       "value" : "Maus20"
     }, {
       "name" : "EMAIL_SMTP_HOST",
-      "value" : "listen.hbz-nrw.de"
+      "value" : "mailhost.hbz-nrw.de"
     }, {
       "name" : "EMAIL_SMTP_PORT",
       "value" : "25"
@@ -465,13 +525,13 @@ Increase "Memory" in the Launch Descriptor of mod-agreements-7.0.9 to 8 GB, if y
 #### ix. Einstellungen für die Lists-App
    mod-lists-2.0.6
    Setze die Umgebungsvariable:
-  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"LIST_APP_S3_BUCKET\",\"value\":\"wdr-test\"}" http://localhost:9130/_/env
+  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"LIST_APP_S3_BUCKET\",\"value\":\"wdr\"}" http://localhost:9130/_/env
 
-### II.v) Run Pre-Upgrade Scripts
-from Quesnelia Release Notes:
-  mod-users-bl-7.7.4
-  Before or after the Upgrade:
- Token in the reset password link expires early. Ensure that mod-users-bl’s RESET_PASSWORD_LINK_EXPIRATION_TIME (default: 24 hours) does not exceed mod-authtoken’s token.expiration.seconds (default: 10 minutes, aber von mir auf 1 Stunde hoch gesetzt)
+### II.v) Lasse Prä-Upgrade-Skripte laufen
+aus den Quesnelia Release Notes:
+  mod-users-bl-7.7.5
+  Vor oder nach dem Upgrade:
+ Das Zeichen im "Passwort-Zurücksetzen"-Link läuft früh ab. Stelle sicher, dass mod-users-bl’s RESET_PASSWORD_LINK_EXPIRATION_TIME (default: 24 hours) does not exceed mod-authtoken’s token.expiration.seconds (default: 10 minutes, aber von mir auf 1 Stunde hoch gesetzt)
    - eine ENV-Variable im Moduldeskriptor hinzufügen:
        }, {
       "name" : "RESET_PASSWORD_LINK_EXPIRATION_TIME",
@@ -481,7 +541,7 @@ from Quesnelia Release Notes:
 ## III. Create new Frontend : Stripes
    Wir bauen zwei Stripes-Container für die beiden Mandanten (aber sie werden noch nicht deployed):
    Wir benutzen das Dockerfile in platform-complete/docker.
-   Überprüfe platform-complete/docker: vim Dockerfile nginx.conf .
+   Überprüfen Sie platform-complete/docker: vim Dockerfile nginx.conf .
    Wenn letzesmal erfolgreich installiert wurde, sollte jetzt nichts zu ändern sein. Einfach "git diff" machen.
    cd ~/platform-complete
    git diff
@@ -495,34 +555,38 @@ from Quesnelia Release Notes:
      useSecureTokens: true,
    in der "config"-Sektion, um Refresh Token Rotation zu aktivieren.
    sudo su
-   # Build the docker container which will contain Stripes and nginx :
-   docker build -f docker/Dockerfile --build-arg OKAPI_URL=https://wdr-test.folio.hbz-nrw.de/okapi --build-arg TENANT_ID=wdr -t stripes .
-Sending build context to Docker daemon   98.4MB
-Step 1/23 : FROM node:18-alpine as stripes_build
+   # Baue den Docker-Container, der Stripes und nginx enthalten wird:
+   docker build -f docker/Dockerfile --build-arg OKAPI_URL=https://wdr.folio.hbz-nrw.de/okapi --build-arg TENANT_ID=wdr -t stripes .
+Sending build context to Docker daemon  95.14MB
+Step 1/21 : FROM node:18-alpine as stripes_build
 18-alpine: Pulling from library/node
+f18232174bc9: Pull complete
 ...
-Step 23/23 : ENTRYPOINT ["/usr/bin/entrypoint.sh"]
- ---> Running in 26fc1286b51a
-Removing intermediate container 26fc1286b51a
- ---> d522541e033d
-Successfully built d522541e033d
+Step 21/21 : ENTRYPOINT ["/usr/bin/entrypoint.sh"]
+ ---> Running in 397b822832f0
+Removing intermediate container 397b822832f0
+ ---> 084ae9661539
+Successfully built 084ae9661539
 Successfully tagged stripes:latest
-  Das läuft ca. 10 Minuten.
+  Das läuft ca. 5 Minuten.
 
 
-## IV. Deploy a new FOLIO backend and enable all modules of the new platform (backend & frontend)
+## IV. Stelle einen neuen FOLIO-Arbeitsbereich auf und aktiviere anschließend alle Module dieser neuen Plattform für Deinen Mandanten.
 
-Now do a snapshot of your system, so you will be able to replay the current status in case the upgrade fails.
-Users should stop working with the system now because after the new backend has been deployed, the front end will be incompatible to the backend and will need to be redeployed, too.
+Jetzt lasse einen Schnappschuss deines Systems machen, der ggfs. zurück gespielt werden kann, falls das folgende Vorgehen fehlschlägt.
+   --- hier weiter ---
+Benutzer sollten jetzt nicht mehr mit dem System arbeiten, denn nachdem ein neues Backend aufgestellt wurde, wird das Frontend nicht mehr damit kompatibel sein und muss ebenfalls neu aufgestellt werden.
   Das System (erneut, nach dem Postgres-Upgrade) vom Netz nehmen.
 
-  # bis hierher 2,5 Std gebraucht (23.01.2025, 16:30 - 19:00)
+  # bis hierher für wdr-test 2,5 Std gebraucht (23.01.2025, 16:30 - 19:00)
+  # bis hierher für wdr 4,5 Std gebraucht (20.03.2025, 15:30 - 20:30, mit 1/2 Std. Pause)
+
   # 24.01.2025 12:50 Uhr
   Besser Kafka runter fahren ; mod-dcb ist mit Kafka bei der Aktivierung abgestürzt.
   sudo su; cd /opt/kafka-zk ; docker-compose down
 
 28.01.2025
-  mod-cdb nicht installieren !
+  mod-dcb nicht installieren !
   # nachträglich am 10.02.2025 gemacht:
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-dcb-1.1.6\",\"action\":\"disable\"},{\"id\":\"mod-circulation-item-1.0.0\",\"action\":\"disable\"},{\"id\":\"edge-dcb-1.1.3\",\"action\":\"disable\"}]" http://localhost:9130/_/proxy/tenants/wdr/install?simulate=true\&preRelease=false
   dann
