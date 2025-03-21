@@ -1,47 +1,40 @@
 ---
-title: "Single server: upgrade"
-linkTitle: "Single server: upgrade"
+title: "Einzelserver: Upgrade"
+linkTitle: "Einzelserver: Upgrade"
 weight: 10
 description: 
 tags: ["subtopic"]
 ---
-A single server installation is being considered a non-production installation. For a production installation some kind of orchestration or failover should be applied. A single server installation of FOLIO is useful for demo and testing purposes.
 
 ![FOLIO Single Server components](/img/single_docker_compose.png)
 
-A FOLIO instance is divided into two main components.  The first component is Okapi, the gateway.  The second component is the UI layer which is called Stripes.  The single server with containers installation method will install both.
+## Dokumentation für einen System-Upgrade
 
-## Upgrade-based installation
+Dies ist eine Dokumentation für einen System-***Upgrade***, keine Neuinstallation.
 
-This is a documentation for an **upgrade** of your FOLIO system. 
+* Es wird angenommen, dass du bereits erfolgreich ein FOLIO-System auf einem Einzelserver aufgesetzt hast und jetzt zu einer aktuelleren Version von FOLIO migrieren möchtest.
 
-* It assumes that you have already successfully installed a FOLIO system and now want to upgrade your system to Poppy. 
+* Diese Dokumentation behandelt den Upgrade einer Distribution "platform-complete".
 
-* If you are deploying FOLIO for the first time, or if you want to start with a fresh installation for whatever reasons, see [how to do a **fresh installation**]({{< ref "singleserverfreshinstall.md" >}}) of a single server deployment.
+## Systemvoraussetzungen
 
-* This documentation shows how to upgrade to a **platform-complete** distribution of Quesnelia.
+**Systemversionen**
 
-* Throughout this documentation, the sample tenant "diku" will be used. Replace with the name of your tenant, as appropriate.
-
-## System requirements
-
-**System versions**
-
-| **System Type**                     | **Version referred to in this manual**     |
+| **Systemtyp**                       | **Version für diese Dokumentation**        |
 |-------------------------------------|--------------------------------------------|
 | Operating system                    | Ubuntu 22.04.2 LTS 64-bits                 |
-| FOLIO system to migrate from        | Poppy CSP#6 (R2-2023-CSP-6)               |
+| FOLIO-Version,von der migriert wird | Poppy CSP#6 (R2-2023-CSP-6)                |
 
 
-**Hardware requirements**
+**Hardwarevoraussetzungen**
 
-| **Requirement** | **FOLIO Platform Complete** |
+| **Anforderung** | **FOLIO Platform Complete** |
 |-----------------|-----------------------------|
 | RAM             | 40GB                        |
 | CPU             | 8                           |
 | HD              | 350 GB SSD                  |
 
-## I. Before the Upgrade
+## I. Vor dem Upgrade
 
 ### I.i) Ubuntu Upgrade
 Erst Ubuntu Updates & Upgrades machen. Das auch auf dem Datenbankserver machen.
@@ -59,10 +52,9 @@ Mach das hier vor dem Upgrade:
 
 ### I.ii) From Quesnelia Release Notes:
 #### 1.) Postgres Upgrade
-Migriere bis zum 14. November 2024 von PostgreSQL 12 auf eine neuere Version.
-PostgreSQL 12 will reach end of life (no security fixes!) on November 14, 2024.
+Migriere bis zum 14. November 2024 von PostgreSQL 12 auf eine neuere Version: PostgreSQL 16.
+PostgreSQL 12 erreichte am 14.11.2024 ihr "Lebensende" (keine Sicherheits-Flicken mehr).
 FOLIO unterstützt von Quesnelia an offiziell PostgreSQL 16.
-These are the high-level steps for moving your data to a new PostgreSQL database with a higher major version:
 
     - das System vom Netz nehmen (auf folio-proxy)
     *****************************************************************************
@@ -99,10 +91,6 @@ These are the high-level steps for moving your data to a new PostgreSQL database
       sudo apt -y install postgresql-16 postgresql-client-16 postgresql-contrib-16
       oder einfach nur
       sudo apt -y install postgresql-16 postgresql-contrib-16
-
-    Es muss auch alles gemacht werden, was man bei der Installation von Postgres 12 gemacht hat:
-
-    # Configure PostgreSQL to listen on all interfaces and allow connections from all addresses (to allow Docker connections).
 
     cd  /etc/postgresql/16/main
         Das Verzeichnis wurde nicht angelegt.
@@ -154,15 +142,19 @@ These are the high-level steps for moving your data to a new PostgreSQL database
              16  main    5433 down   postgres /var/lib/postgresql/16/main /var/log/postgresql/postgresql-16-main.log
         sudo systemctl daemon-reload
 
-    Edit (via sudo) the file /etc/postgresql/16/main/postgresql.conf 
-      add line listen_addresses = '*' in the "Connection Settings" section.
-      In the same file, increase max_connections = 1200
-      In the same file, change log_timezone and timezone, otherwise they will be UTC.
-    Edit (via sudo) the file /etc/postgresql/16/main/pg_hba.conf to add line host all all 0.0.0.0/0 md5
+    # Es muss auch alles gemacht werden, was man bei der Installation von Postgres 12 gemacht hat:
+
+    # Konfiguriere PostgreSQL, so dass es auf alle Schnittstellen lauscht und Verbindungen zu allen Adressen erlaubt (um Verbindungen nach "Docker" zu erlauben)
+
+    Editiere (via sudo) die Datei /etc/postgresql/16/main/postgresql.conf 
+      Füge eine Zeile hinzu: listen_addresses = '*' im Bereich "Connection Settings".
+      In der gleichen Datei, erhöhe max_connections = 1200
+      In der gleichen Datei, ändere log_timezone und timezone, sonst wird es UTC sein.
+    Editiere (via sudo) die Datei /etc/postgresql/16/main/pg_hba.conf, füge eine Zeile hinzu: host all all 0.0.0.0/0 md5
     Umbenennen in dem file: scram-sha-256 => md5
     diff /etc/postgresql/12/main/pg_hba.conf /etc/postgresql/16/main/pg_hba.conf
       - es sollte sich nur in Kommentarzeilen unterscheiden^
-    Restart PostgreSQL with command sudo systemctl restart postgresql
+    Neustart PostgreSQL mit dem Befehl sudo systemctl restart postgresql
     Die postgresql-16 läuft jetzt auf dem Port
            port = 5433 in postgresql.conf
     Es laufen jetzt beide postgresql.
@@ -171,8 +163,8 @@ These are the high-level steps for moving your data to a new PostgreSQL database
 
 
 
-    4. Restore the backup to your new database.
-    *******************************************
+    4. Stelle das Datenbank-Backup in der neuen Datenbankversion wieder her.
+    *************************************************************************
       # -b = bindir (alt), -d = datadir (alt), -o : Optionen, die direkt an das alte postgres-Kommando übergeben werden
       # -B = bindir (neu), -D = datadir (neu), -O : Optionen, die direkt an das neue postgres-Kommando übergeben werden
     # pg_upgrade -b /usr/lib/postgresql/12/bin -B /usr/lib/postgresql/16/bin -d /var/lib/postgresql/12/main -D /var/lib/postgresql/16/main [option...]
@@ -187,27 +179,28 @@ These are the high-level steps for moving your data to a new PostgreSQL database
     cd /usr/folio/dbupgrade (das Verzeichnis muss postgres:postgres gehören)
     su - postgres
     ./ks.upgrade.sh # erst mit --check laufen lassen
-     Checking for new cluster tablespace directories               ok
+     *Checking for new cluster tablespace directories               ok
      *Clusters are compatible*, ...
     dann ohne check laufen lassen:
     ./ks.upgrade.sh
 
     # logfiles sind in /var/lib/postgresql/16/main/pg_upgrade_output.d
     Der Upgrade war erfolgreich:
-    Your installation contains extensions that should be updated
-with the ALTER EXTENSION command.  The file
-    update_extensions.sql
-when executed by psql by the database superuser will update
-these extensions.
-"/usr/lib/postgresql/16/bin/pg_ctl" -w -D "/var/lib/postgresql/16/main" -o "-c config_file=/etc/postgresql/16/main/postgresql.conf" -m smart stop >> "/var/lib/postgresql/16/main/pg_upgrade_output.d/20250123T171517.990/log/pg_upgrade_server.log" 2>&1
 
-Upgrade Complete
-----------------
-Optimizer statistics are not transferred by pg_upgrade.
-Once you start the new server, consider running:
-    /usr/lib/postgresql/16/bin/vacuumdb --all --analyze-in-stages
-Running this script will delete the old cluster's data files:
-    ./delete_old_cluster.sh
+    "Your installation contains extensions that should be updated
+    with the ALTER EXTENSION command.  The file
+        update_extensions.sql
+    when executed by psql by the database superuser will update
+    these extensions.
+    "/usr/lib/postgresql/16/bin/pg_ctl" -w -D "/var/lib/postgresql/16/main" -o "-c config_file=/etc/postgresql/16/main/postgresql.conf" -m smart stop >> "/var/lib/postgresql/16/main/pg_upgrade_output.d/20250123T171517.990/log/pg_upgrade_server.log" 2>&1
+    
+    Upgrade Complete
+    ----------------
+    Optimizer statistics are not transferred by pg_upgrade.
+    Once you start the new server, consider running:
+        /usr/lib/postgresql/16/bin/vacuumdb --all --analyze-in-stages
+    Running this script will delete the old cluster's data files:
+        ./delete_old_cluster.sh"
 
     Jetzt die postgresql-12 deinstallieren.
        sudo apt --purge remove postgresql-12
@@ -231,7 +224,7 @@ Running this script will delete the old cluster's data files:
     # einspielen der Dumps (nicht gemacht)
     Run VACUUM ANALYZE; command to reorganize PostgreSQL indices. For better performance, it can be started parallel using the following command: VACUUM (PARALLEL 4, ANALYZE); where 4 is the number of allocated processors in server.
 
-    - Crontab für root installieren. Das Log von mod-quick-marc periodisch löschen (wie auf folio-hbz4)
+    - Crontab für User root installieren. Das Log von mod-quick-marc periodisch löschen (wie auf folio-hbz4)
     - Okapi restart
       [ bis hierher auf folio-hbz3 90 Minuten gebraucht (postgres 16 ließ sich nicht installieren)]
       systemctl start okapi.service ; das okapi-log verfolgen
@@ -244,6 +237,7 @@ Running this script will delete the old cluster's data files:
 
 #### 2.) mod-data-export-spring
 Auf wdr und wdr-test nicht gemacht.
+----schnipp---
 This manual task is only needed if at least one other tenant stays on Poppy. This manual task is not needed if all tenants are migrated to Quesnelia at the same time.
 Before migrating a tenant from Poppy to Quesnelia run
 UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '8:cd7cacfe2480c5305d1eaff157a35e4f' WHERE id = 'quartz-init' .
@@ -258,22 +252,23 @@ Without the manual task the Poppy version of mod-data-export-spring fails and sh
 "Change failed validation!
  Error creating bean with name 'quartzSchemaInitializer'
  initial-schema.xml::quartz-init::quartz was: 9:89aea1286f2c2901835da380fa17eff7 but is now: 8:cd7cacfe2480c5305d1eaff157a35e4f"
+----schnipp---
 
 ### Weitere vorbereitende Schritte
 There might be more preparatory steps that you need to take into account for your installation. If you are unsure what other steps you might need to take, study carefully the Release Notes.  Do all actions in the column "Action required", as appropriate for your installation.
 
 
 ## II. Upgrade Okapi und Vorebereitung des Werkstattmodul-Upgrades
-### II.i) Fetch a new version of platform-complete
-Fetch the new release version of platform-complete, change into that directory: 
+### II.i) Hole eine neue Version von "platform-complete"
+ Hole die neue Version von "platform-complete", wechsele in das Verzeichnis:
 ```
 cd platform-complete
 git fetch
 ```
 Es gibt einen Zweig R1-2024-csp-9. Den installieren wir.
-Check out this Branch.
-Stash local changes. This should only pertain to stripes.config.js .
-Discard any changes which you might have made on the install-jsons:
+Leihe diesen Zweig aus.
+Stecke lokale Änderungen in die Tasche. Das sollte nur stripes.config.js betreffen.
+Verwerfe alle Änderungen, die du vielleicht an den "install-json"-Dateien gemacht hast:
 
 ```
 git restore install.json
@@ -291,7 +286,7 @@ Den Zusammenführungs-Konflikt in stripes.config.js beheben.
 
 ### II.ii) Upgrade Okapi
 Die Okapi-Version hochziehen und Okapi neu starten.
-Die Quesnelia-Okapi-Version aus install.json: **okapi-5.3.0**
+Die Okapi-Version für "Bromelie" aus install.json: **okapi-5.3.0**
 
 Baue Okapi aus den Quelldateien
 ```
@@ -308,7 +303,7 @@ Neustart Okapi
   sudo systemctl restart okapi
 ```
 
-Folge /var/log/folio/okapi/okapi.log . 
+Verfolge /var/log/folio/okapi/okapi.log . 
 
 Okapi startet die Module neu. Verfolge das okapi.log. Okapi wird 5 Minuten oder so benötigen, bis alle Module wieder oben sind. Überprüfe, ob alle Module laufen:
 
@@ -316,7 +311,7 @@ Okapi startet die Module neu. Verfolge das okapi.log. Okapi wird 5 Minuten oder 
 docker ps | grep "mod-" | wc
   67
 ```
-Diese Zahl bezieht sich auf eine Vollinstallation von Poppy.
+Diese Zahl bezieht sich auf eine Vollinstallation von "Mohnblume".
   folio-hbz4: es sind sogar 69. mod-remote-storage und mod-service-interaction laufen in je 2 Versionen.
   folio-hbz4: es sind 70. Geht dann auf 68 zurück (2 stürzen ab).
 
@@ -330,12 +325,12 @@ curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/wdr/modules
 } ]
 ```
 
-Eine vollständige Plattform von Poppy hat 11 Kanten-Module, 62 Schaufenstermodule (folio_\*), und 67 Werkstattmodule (mod-\*), sowie die Quesnelia-version des Portals Okapi (5.3.0).
+Eine vollständige Plattform von "Mohnblume" hat 11 Kanten-Module, 62 Schaufenstermodule (folio_\*), und 67 Werkstattmodule (mod-\*), sowie die Bromelien-version des Portals Okapi (5.3.0).
 
 
 ### II.iii) Ziehe die Moduldeskriptorem aus der zentralen Registrierung
 
-A module descriptor declares the basic module metadata (id, name, etc.), specifies the module's dependencies on other modules (interface identifiers to be precise), and reports all "provided" interfaces. As part of the continuous integration process, each module descriptor is published to the FOLIO Registry at https://folio-registry.dev.folio.org.
+# A module descriptor declares the basic module metadata (id, name, etc.), specifies the module's dependencies on other modules (interface identifiers to be precise), and reports all "provided" interfaces. As part of the continuous integration process, each module descriptor is published to the FOLIO Registry at https://folio-registry.dev.folio.org.
 
 ```
 curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '{ "urls": [ "https://folio-registry.dev.folio.org" ]  }' http://localhost:9130/_/proxy/pull/modules
@@ -351,9 +346,9 @@ Im Okapi-Log sieht man dann etwas wie:
 ```
 
 ### II.iv) Konfiguriere die Umgebungsvariablen der Module
-This part is the one in which a system operator needs to take the most care and will probably spend the most time on.
+Auf diesem Teil wird ein Systemadministrator vermutlich die meiste Zeit aufwenden.
 
-Check your Okapi environment:
+Überprüfe die Umgebungsvariablen für Okapi:
 
 ```
  curl -X GET http://localhost:9130/_/env
@@ -375,13 +370,13 @@ Log in as these users with this password. If that doesn't work, change the passw
   => das ist in Zukunft nicht mehr nötig. Es ist der Fall und für neue User ist es automatisch der Fall, z.B. dcb-system-user, neu in Quesnelia.
 
 #### i. Set new global environment variables
-Set the ENV var -- only required in a multi-tenant environment
-If you are in a multi-tenant environment, set environment variable ENV to ENV = quesnelia . In a single tenant environment, you don't need to set it . It has the default value ENV = folio. => trotzdem setzen
+Setze die Umgebungsvariable ENV -- das ist nur bei einem System mit mehreren Mandanten notwendig.
+Setze die Umgebungsvariable ENV auf ENV = quesnelia . Wenn du nur einen einzigen Mandanten auf dem System betreibts, brauchst du dies nicht zu machen. Die Variable hat dann den Standardwert ENV = folio. => trotzdem setzen
 ```
 curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"ENV\",\"value\":\"quesnelia\"}" http://localhost:9130/_/env
 ```
 
-Set INNREACH_TENANTS - otherwise mod-inn-reach will not start for your tenant:
+Setze INNREACH_TENANTS - ansosnten wir mod-inn-reach für deinen Mandanten nicht anstarten:
 ```
 curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"INNREACH_TENANTS\",\"value\":\"wdr\"}" http://localhost:9130/_/env
 ```
@@ -391,8 +386,8 @@ Make sure KAFKA_HOST and KAFKA_PORT are set in /env, otherwise mod-user will fai
 
 Set DB_CONNECTION_TIMEOUT to at least 250, otherwise mod-entities-links will fail startup.
   
-#### ii. Incompatible Hazelcast version in mod-remote-storage
-During the upgrade, the Poppy and Quesnelia versions of mod-remote-storage will run in parallel. This will only work if they are on different Hazelcast clusters. Set the Hazelcast cluster name for the Quesnelia version to "quesnelia":
+#### ii. Inkompatible Hazelcast-Versionen in mod-remote-storage
+Während des Upgrades der Module werden die beiden Versionen "Mohnblume" und "Bromelie" von mod-remote-storage parallel laufen. Das funktioniert aber nur, wenn sie verschiedenen "Hazelcast"-Trauben zugeordnet sind. Setze den Namen der Hazelcast-Traube für die Bromelien-Version auf "quesnelia":
 ```
   # Konfiguriere mod-remote-storage-3.2.0 (Quesnelia-Version)
   cd ~/folio-install
@@ -406,32 +401,32 @@ During the upgrade, the Poppy and Quesnelia versions of mod-remote-storage will 
    curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-remote-storage-3.2.0-module-descriptor.json http://localhost:9130/_/proxy/modules
 ```
 
-#### iii. OAI-PMH (mod-oai-pmh) configuration.
+#### iii. OAI-PMH (mod-oai-pmh) Konfiguration.
 Das muss man natürlich nur machen, wenn man die OAI-Schnittstelle auch tatsächlich benutzen will.
-For stable operation, mod-oai-pmh  requires the following memory configuration: 
+Um staibl arbeiten zu könnnen benötigt mod-oai-pmh die folgende Speicherkonfiguration:
   Editiere mod-oai-pmh-3.13.2-module-descriptor.json
 ```
 JAVA_OPTIONS: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx2160m
 ```
-edge-oai-pmh memory settings remain the same as in previous releases: 
+Die Speichereinstellungen für edge-oai-pmh sind dieselben wie in vorhergehenden Versionen:
   Editiere edge-oai-pmh-2.9.2-module-descriptor.json
 ```
 JAVA_OPTIONS: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx1440m
 ```
 
-#### iv. S3 storage compatible environment variables
+#### iv. Für S3-Speicher kompatible Umgebungsvariablen.
 Einige Module benutzen S3-kompatiblen persistenten Speicher (AWS-S3 oder Minion-Server).
-mod-data-export-worker has been using it since some releases ago.
-Modules that now also make use of it are:
+mod-data-export-worker benutzt es schon seit längerer Zeit.
+Andere Module, die S3-(kompatiblen)-Speicher benutzen, sind:
   mod-bulk-operations,
   mod-data-import - if you want to use the splitting functionality for large MARC21 import files,
   mod-oai-pmh - if you want to store error logs,
   mod-lists - in order to support exporting list contents.
   mod-entities-links
   mod-data-export
-  Set at least these env vars in these modules (set them in Okapi's global env):
+  Setze zumindest dies Umgebungsvariablen. Du kannst sie in Okapis globalen Umgebungsvariablen setzen:
        S3_URL, S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY.
-  Remove all AWS_* vars as they are replaced by S3_*. Set
+  Entferne alle AWS_* vars (optional), denn sie wurden durch S3_*. 
 
   Teste Browser-Zugriff auf den minio-Server:
     http://folio-minio.hbz-nrw.de:9090/
@@ -441,9 +436,9 @@ Modules that now also make use of it are:
   curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_IDS_BATCH\",\"value\":\"1000\"}" http://localhost:9130/_/env
   curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_FILES_MAX_POOLSIZE\",\"value\":\"10\"}" http://localhost:9130/_/env
 
-#### v. Set jwt.signing.key for mod-authtoken
+#### v. Setze jwt.signing.key für mod-authtoken
 Im Hochfahr-Deskriptor von mod-authtoken-2.15.2, setze jwt.signing.key in der JAVA_OPTION auf den gleichen Wert, wie du ihn in der vorhergehenden Version (Poppy, mod-authtoken-2.14.1) gesetzt hast:
-Set expiration seconds for expiring tokens (set LEGACY_TOKEN_TENANTS="*" if you do not want to utilize expiring tokens):
+Setze Sekundendauer für verfallende Zeichen (Setze LEGACY_TOKEN_TENANTS="*", wenn du verfallende Zeichen nicht benutzen möchtest)
 ```
     "env" : [ {
       "name" : "JAVA_OPTIONS",
@@ -457,19 +452,19 @@ Set expiration seconds for expiring tokens (set LEGACY_TOKEN_TENANTS="*" if you 
     }, {
 ```
 
-#### vi. Set env vars for mod-search
-If you have set ENV = quesnelia, set KAFKA_EVENTS_CONSUMER_PATTERN, using the value of ENV as a part of its value:
+#### vi. Setze Umgebungsvariablen für mod-search
+Wenn du ENV = quesnelia gesetzt hast, setze KAFKA_EVENTS_CONSUMER_PATTERN, indem du den Wert von ENV als Teil seines Wertes setzt:
   curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"KAFKA_EVENTS_CONSUMER_PATTERN\",\"value\":\"(quesnelia.)(.*.)inventory.(instance|holdings-record|item|bound-with)\"}" http://localhost:9130/_/env
     
-If you have set ENV = folio, set  KAFKA_EVENTS_CONSUMER_PATTERN = (folio.)(.*.)inventory.(instance|holdings-record|item|bound-with)
+Hast du dagegen ENV = folio gesetzt, dann setze  KAFKA_EVENTS_CONSUMER_PATTERN = (folio.)(.*.)inventory.(instance|holdings-record|item|bound-with)
 
 in mod-search-3.2.7 ,
-Set KAFKA_EVENTS_CONSUMER_PATTERN = (quesnelia\\.)(.*\\.)inventory\\.(instance|holdings-record|item|bound-with)
-Set other CONSUMER_PATTERNS in the module descriptor, as well.
-Set SEARCH_BY_ALL_FIELDS_ENABLED to "true" if you want to activate the search option "all" (search in all fields). By default, SEARCH_BY_ALL_FIELDS_ENABLED is set to "false".
+Setze KAFKA_EVENTS_CONSUMER_PATTERN = (quesnelia\\.)(.*\\.)inventory\\.(instance|holdings-record|item|bound-with)
+Setze andere CONSUMER_PATTERNS im Moduldeskriptor ebenfalls, auf einen äquivalenten Wert.
+Setze SEARCH_BY_ALL_FIELDS_ENABLED auf "wahr" ("true"), wenn du die Suchoption "alle" aktivieren möchtest (suche in allen Feldern). Standardmäßig ist die Suche "in allen Feldern" ausgestellt.
 
 #### vii. mod-agreements
-Increase "Memory" in the Launch Descriptor of mod-agreements-7.0.10 to 8 GB, if you want to connect FOLIO to GOKB.
+Vergrößere den Speicher im Hochfahrdeskriptor von mod-agreements-7.0.10 auf 8 GB, wenn du FOLIO mit einer GoKB verbinden möchtest.
 ```
   "dockerArgs" : {
       "HostConfig" : {
@@ -477,7 +472,7 @@ Increase "Memory" in the Launch Descriptor of mod-agreements-7.0.10 to 8 GB, if 
 ```
 
 #### viii. E-Mail-Konfiguration für Versand über hbz-SMTP-Server in mod-email anlegen
-  in den Moduldeskriptor von mod-email-1.17.0  einfügeni (aus bisherigem Moduldeskriptor mod-email-1.16.0 kopieren):
+  in den Moduldeskriptor von mod-email-1.17.0  einfügen (aus bisherigem Moduldeskriptor mod-email-1.16.0 kopieren):
     }, {
       "name" : "FOLIO_HOST",
       "value" : "http://folio-hbz4.hbz-nrw.de"
@@ -574,51 +569,52 @@ Successfully tagged stripes:latest
 ## IV. Stelle einen neuen FOLIO-Arbeitsbereich auf und aktiviere anschließend alle Module dieser neuen Plattform für Deinen Mandanten.
 
 Jetzt lasse einen Schnappschuss deines Systems machen, der ggfs. zurück gespielt werden kann, falls das folgende Vorgehen fehlschlägt.
-   --- hier weiter ---
+  # bis hierher für wdr-test 2,5 Std gebraucht (23.01.2025, 16:30 - 19:00)
+  # bis hierher für wdr 4,5 Std gebraucht (20.03.2025, 15:30 - 20:30, mit 1/2 Std. Pause)
 Benutzer sollten jetzt nicht mehr mit dem System arbeiten, denn nachdem ein neues Backend aufgestellt wurde, wird das Frontend nicht mehr damit kompatibel sein und muss ebenfalls neu aufgestellt werden.
   Das System (erneut, nach dem Postgres-Upgrade) vom Netz nehmen.
 
-  # bis hierher für wdr-test 2,5 Std gebraucht (23.01.2025, 16:30 - 19:00)
-  # bis hierher für wdr 4,5 Std gebraucht (20.03.2025, 15:30 - 20:30, mit 1/2 Std. Pause)
-
-  # 24.01.2025 12:50 Uhr
+  # weiter 24.01.2025 12:50 Uhr
+  # weiter 21.03.2025 09:30 Uhr
+  Gucken, ob alle Dienste nach dem Snapshot wieder angestartet sind.
   Besser Kafka runter fahren ; mod-dcb ist mit Kafka bei der Aktivierung abgestürzt.
   sudo su; cd /opt/kafka-zk ; docker-compose down
+    ==> mod-data-export-worker loggt wie blöde; "Kafka nicht verfügbar"
 
-28.01.2025
   mod-dcb nicht installieren !
-  # nachträglich am 10.02.2025 gemacht:
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-dcb-1.1.6\",\"action\":\"disable\"},{\"id\":\"mod-circulation-item-1.0.0\",\"action\":\"disable\"},{\"id\":\"edge-dcb-1.1.3\",\"action\":\"disable\"}]" http://localhost:9130/_/proxy/tenants/wdr/install?simulate=true\&preRelease=false
-  dann
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-dcb-1.1.6\",\"action\":\"disable\"},{\"id\":\"mod-circulation-item-1.0.0\",\"action\":\"disable\"},{\"id\":\"edge-dcb-1.1.3\",\"action\":\"disable\"}]" http://localhost:9130/_/proxy/tenants/wdr/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dfalse
-  Ansonsten jetzt die 3 Module aus der install.json heraus nehmen.
+  Jetzt die 3 Module aus der install.json heraus nehmen (Einträge löschen).
+  # ansonsten nachträglich am 10.02.2025 gemacht:
+  # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-dcb-1.1.6\",\"action\":\"disable\"},{\"id\":\"mod-circulation-item-1.0.0\",\"action\":\"disable\"},{\"id\":\"edge-dcb-1.1.3\",\"action\":\"disable\"}]" http://localhost:9130/_/proxy/tenants/wdr/install?simulate=true\&preRelease=false
+  # dann
+  # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-dcb-1.1.6\",\"action\":\"disable\"},{\"id\":\"mod-circulation-item-1.0.0\",\"action\":\"disable\"},{\"id\":\"edge-dcb-1.1.3\",\"action\":\"disable\"}]" http://localhost:9130/_/proxy/tenants/wdr/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dfalse
 
-Deploy all backend modules of the new release with a single post to okapi's install endpoint. 
-This will deploy and enable all new modules. Start with a simulation run:
+  Stelle alle Werkstattmodule der neuen Version mit einer einzigen Senden-Anfrage an Okapis Installations-Endpunkt bereit:
+  Das wird alle neuen Module aufstellen und aktivieren. Beginne mit einem Simualtionslauf:
 ```
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/wdr/install?simulate=true\&preRelease=false
 ```
-Then try to run with "deploy=true" like this.
+  Dann wiederhole die gleiche Anfrage mit "deploy=true": 
 ```
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/wdr/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dfalse
 ```
-This call fails because frontend modules can not be deployed (we do this call anyway). 
-You will get a message "HTTP 400 - Module folio_developer-8.0.1 has no launchDescriptor".
-But this call deploys all backend modules. It did not enable any backend modules.
+  Diese Anfrage wird fehlschlagen, weil Schaufenstermodule nicht von Docker aufgestellt werden können. - Wir machen diese Anfrage trotzdem.
+  Sie werden folgende Nachricht vom System erhalten: "HTTP/1.1 400 Bad Request Module folio_developer-8.0.1 has no launchDescriptor".
+  Aber diese Anfrage wird alle Werkstattmodule aufstellen. Sie wird allerdings noch keine Module aktivieren.
 
-You can follow the progress in deployment on the terminal screen and/or in /var/log/folio/okapi/okapi.log .
-Don't continue before all new modules have been deployed. Check by executing
+ Verfolge den Fortschritt der Modulaufstellung auf der Konsole oder in der Protokolldatei /var/log/folio/okapi/okapi.log .
+  Mache nicht weiter bis alle Module aufgestellt worden sind. Überprüfe dieses mit der folgenden Anweisung:
 ```
-docker ps | grep mod- | wc
+  docker ps | grep mod- | wc
 ```
-This number should go up to 135 before you continue (133 ohne mod-dcb und mod-circulation-item). => geht auf wdr-test nur auf 133.
-This number comprises of 67 backend modules from Poppy and 71 backend modules from the Quesnelia release.
-There are 3 modules which are present in both releases in the same module version and have not been deployed twice.
+Es sollten 135 Module werden, bevor du weiter machst. (133 ohne mod-dcb und mod-circulation-item). => geht auf wdr-test nur auf 133. Auf wdr nur auf 131.
+ Diese Anzahl besteht aus 67 Werkstattmodulen der Mohnblumen-Version und 71 Werkstattmodulen der Bromelien-Version.
+ Es gibt 3 Moduleversionen, die in beiden Versionen vorkommen. Diese wurden NICHT zweimal aufgestellt.
 
-We finish up by enabeling all modules (backend & frontend) with a single call without deploying any.
+  Wir schließen die Aktion ab, indem wir alle Module (Schaufenster und Werkstatt) mit einer einzigen Anfrage aktivieren, ohne weitere Module aufzustellen.
 
   Exkurs:
-    We here choose to load reference data for all modules . If library has changed any reference data and migrates using loadReference = true: Make a backup before migration and restore afterwards. From Quesnelia Release Notes: "Migration from Poppy to Quesnelia resets reference data. 
+    Wir entscheiden uns dazu, Referenzdaten für alle Module zu laden.
+    If library has changed any reference data and migrates using loadReference = true: Make a backup before migration and restore afterwards. From Quesnelia Release Notes: "Migration from Poppy to Quesnelia resets reference data. 
     Other modules don’t touch existing reference data when migrating with parameter loadReference = true, but mod-circulation-storage does.
     Most notable reference data that gets reset to default: Circulation rules."
   Ende Exkurs.
@@ -626,22 +622,29 @@ We finish up by enabeling all modules (backend & frontend) with a single call wi
   # Kafka wieder hoch fahren
   cd /opt/kafka-zk
   docker-compose up -d
+    => die massenhafter Log-Meldungen hören auf.
 
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/wdr/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
     HTTP/1.1 200 OK
 
-  If that fails, remedy the error cause and try again until the post succeeds. 
+  Wenn das fehlschlägt, finde den Grund dafür heraus, behebe die Fehlerursache und versuche es erneut, bis die Anfrage erfolgreich war.
 
-  Das dauert 90 Sekunden pro Mandant.
+     wdr: Im Okapi-Log sind jetzt zunächst irgendwelche Leitungen blockiert:
+    10:09:51 [] [] [] [] WARN  ?                    Thread Thread[vert.x-eventloop-thread-0,5,main] has been blocked for 39484 ms, time limit is 2000 ms
+io.vertx.core.VertxException: Thread blocked
+      => einfach abwarten. Danach geht es dann aber doch los mit den Aktivierungen.
 
-  Repeat this step for any other tenants (who have enabled platform-complete) on your system.
+  Das dauert 90 Sekunden pro Mandant (wdr-test, hbz-test).
+  Auf wdr hat es aber 6 Minuten gedauert.
 
-  We will take care of old modules that are not needed anymore but are still running (deployed) in the "Clean up" section.
+  Wiederhole diesen Schritt für eventuelle weitere Mandanten (solche, die ebenfalls platform-complete installiert haben) auf deinem System.
 
-       68 Quesnelia-Backend-Module wurden während "deploy=true" für wdr hochgefahren (66 ohne mod-dcb und mod-circluation-item).
-       Es sind aber 71 Backend-Module in Quesnelia. 3 Module sind in Poppy und Quesnelia gleich.
+  Alte Module, die noch laufen, aber nun nicht mehr benötigt werden, werden wir im "Aufräum"-Kapitel entfernen.
+ 
+       68 Bromelien-Werkstattmodule wurden während "deploy=true" für wdr hochgefahren (66 ohne mod-dcb und mod-circluation-item).
+       Es sind aber 71 Werkstattmodule in Quesnelia. 3 Module sind in Poppy und Quesnelia gleich.
        67 Backend-Module liefen schon vorher (Poppy).
-  There should now be 135 modules deployed on your single server, try
+   Es sollte nun 135 Module auf deinem Server geben. Versuche
 
   docker ps | grep "mod-" | wc
     135 (133) sollen es sein.
@@ -649,7 +652,7 @@ We finish up by enabeling all modules (backend & frontend) with a single call wi
        Auf folio-hbz4 läuft außerdem noch:
        3d274f3c628f   folioorg/mod-licenses:5.0.3  (ist das keine Poppy-Version ?)
 
-  64 of those modules belong to the Poppy release only, 68 belong to the Quesnelia release only and three modules belongs to both releases.
+  64 dieser Module gehören zur Mohnblumen-Version, 68 gehören ausschließlich zur Bromelien-Version, und drei Modulversionen gehören zu beiden FOLIO-Versionen.
   * nicht neu in Quesnelia (Quesnelia = Poppy Version):
     mod-z3950:3.3.5
     mod-graphql:1.12.1
@@ -661,67 +664,66 @@ We finish up by enabeling all modules (backend & frontend) with a single call wi
     mod-circulation-item:1.0.0
     mod-batch-print:1.2.0
 
-Modules enabled for your tenant are now those of the Quesnelia release:
+  Jetzt sind die Module der Bromelien-Version für deinen Mandanten aktiviert:
 ```
-curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/wdr/modules | grep id | wc
+  curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/wdr/modules | grep id | wc
   148 (145 ohne mod-dcb, mod-circulation-item und edge-dcb)
 ```
 
-This number is the sum of the following:
+  Diese Zahl ist die Summe folgender Anzahlen:
 
- Quesnelia CSP-8 Release (siehe ~/folio-install/modules.quesnelia.csv):
- - 64 Frontend modules
- - 12 Edge modules
- - 71 Backend modules
- -  1 Okapi module (5.3.0)
+ Bromelie CSP-9 Veröffentlichung (siehe ~/folio-install/modules.quesnelia.csv):
+ - 64 Schaufenstermodule
+ - 12 Kantenmodule
+ - 71 Werkstattmodule
+ -  1 Okapi-Modul (Portal) (5.3.0) 
 
-These are all R1-2024 (Quesnelia) modules.
+  Das sind alle Module der Veröffentlichung R1-2024 "Bromelie".
 
-## V. Start the new Frontend
-  Stop the old Stripes container: 
+## V. Bringe das neue Vorderende an den Start
+  Halte den alten Stripes-Container an:
 ```
   docker stop stripes
   docker rm stripes
 ```
-  Start the new stripes container.
-  Redirect port 80 from the outside to port 80 of the docker container:
+  Starte den neuen Stripes-Container.
+  Leite Hafen 80 von innerhalb des Hafenarbeiter-Behältnisses nach Hafen 80 auch außerhalb weiter.
 ```
   cd /usr/folio/platform-complete
   sudo su
   ## systemctl start stripes
-  # der Service fährt auf folio-hbz4 nicht hoch, also dann so:
   nohup docker run -d -p 80:80 --name stripes stripes &
+  docker stop stripes
+  systemctl start stripes
 ```
 
-Repeat these steps for the Stripes containers of any other tenants.
+  Wiederhole diese Schritte für die Stripes-Behältnisse eventueller anderer Mandanten.
 
-Das System wieder ans Netz bringen (auf folio-proxy).
-Clear browser cache.
-Log in to your frontend: Einloggen auf https://wdr-test.folio.hbz-nrw.de, hbz_admin:WdR2021!
-                         Einloggen auf https://bthvn-test.folio.hbz-nrw.de, bthvn_admin:LvB2023!
+  Das System wieder ans Netz bringen (auf folio-proxy).
+  Browser-Cache löschen.
+  Im Browser am System anmelden: Einloggen auf https://wdr.folio.hbz-nrw.de, folio_admin
 
-  - Can you see the inew Quesnelia modules in Settings - Installation details ?
+  - Sehen Sie die Bromelien-Module in Einstellungen - Installationsdetails ?
 
-  - Do you see the right Okapi version, 5.3.0 ? 
+  - Sehen Sie die richtige Okapi-Version, 5.3.0 ? 
 
-  - Does everything look good ?
+  - Sieht auch sonst alles gut aus ?
 
-It is now possible to access the system via the UI, again.
-However, changes in permission sets and long-running migration jobs still need to be carried out before the system can be used productively. You will not see the inventory data, yet, because a re-index needs to be done, first.
-   - man sieht einen offenbar automatisch angelegten Titel: DCB_INSTANCE
+  Man kann jetzt wieder von der Nutzerschnittstelle auf das System gehen.
+  Es müssen aber noch Änderungen in den Erlaubnismengen und langlaufende Migrationsarbeiten ausgeführt werden, bevor man das System wieder produktiv nutzen kann.
+  Sie sehen außerdem die Katalogdaten nich nicht, weil noch eine Reindexierung ausgeführt werden muss.
 
 
-## VI. Cleanup
-Clean up. 
-Clean up your docker environment: Remove all stopped containers, all networks not used by at least one container, all dangling images and all dangling build cash:
+## VI. Aufräumen
+
+  Räume deine Hafenarbeiter-Umgebung auf: Entferne alle angehaltenen Behältnisse, alle ungenutzten Netzwerke und alle herumhängenden Abbilder:
 ```
   docker system prune -a
 ```
-  Total reclaimed space: 3.45GB
-This command might run for some minutes.
+  Total reclaimed space: 10.64GB
 
-  Undeploy all unused containers: Delete all modules from Okapi's discovery which are not part of the Quesnelia release.
-  Undeploy old module versions like this:
+  Entferne alle ungenutzen Behältnisse: Lösche alle Module, die nicht Teil des Veröffentlichungspaketes "Bromelie" sind, aus der Entdeckungsschicht des Portals.
+  Entferne alte Modulversionen auf dieser Weise:
 ```
 curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-agreements-5.5.2
 curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-audit-2.7.0
@@ -729,25 +731,26 @@ curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-audit-
 curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-z3950-3.3.2
 ```
 
-  Das sind 64 Module von Poppy (alle bis auf 3).
+  Das sind 64 Module der "Mohnblume" (alle bis auf 3).
 
-  Außerdem auf hbz-4 noch 10 Edge-Module, die in niedrigerer Version als Quesnelia noch deployed sind.
+  Außerdem auf hbz-4 noch 10 Kantenmodule, die in niedrigerer Version als "Bromelie" noch aufgestellt sind.
      Finde sie heraus mit:
      docker ps | grep edge- | sort -k 2
 
-   Ich habe dieses Skript erzeugt und ausgeführt. Es enthält nur (und alle) Poppy-Instanzen, die nicht auch Teil von Quesnelia sind, sowie die überzähligen Edge-Module.
-   Alle 74 jetzt noch zu löschenden Module (inkl. edge-Module) stehen in diesem Skript:
+   Ich habe dieses Skript erzeugt und ausgeführt. Es enthält nur (und alle) Mohnblumen-Instanzen, die nicht auch Teil von Bromelie sind, sowie die überzähligen Kantenmodule.
+   Alle 74 jetzt noch zu löschenden Module (inkl. Kantenmodule) stehen in diesem Skript:
    cd ~/folio-install
-   ./dockerps.todelete.fromPoppy.sh
+   ./dockerps.todelete.derMohnblume.sh
 
-   mod-graphql-1.12.1 auf folio-hbz4 noch zusätzlich entfernt:
+   # mod-graphql-1.12.1 auf folio-hbz4 und folio-hbz3 noch zusätzlich entfernt:
   curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-graphql-1.12.1
-   ebenso mod-search-3.0.9
+   # ebenso mod-search-3.0.9
   curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-search-3.0.9
-   dafür fehlt nun ein Modul (es sind nur noch 70): mod-settings-1.0.3 ist nicht hoch gekommen.
-  Wir deployen mod-settings-1.0.3 nach:
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-settin
-gs-1.0.3\",\"action\":\"enable\"}]" http://localhost:9130/_/proxy/tenants/wdr/install?simulate=true\&preRelease=false
+   # auf folio-hbz3 auch noch mod-orders-12.7.4
+  curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-orders-12.7.4
+   # dafür fehlt nun ein Modul (es sind nur noch 68): mod-settings-1.0.3 ist nicht hoch gekommen.
+   # Wir deployen mod-settings-1.0.3 nach:
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-settings-1.0.3\",\"action\":\"enable\"}]" http://localhost:9130/_/proxy/tenants/wdr/install?simulate=true\&preRelease=false
 HTTP/1.1 200 OK
 Content-Type: application/json
 content-length: 62
@@ -767,41 +770,42 @@ content-length: 62
 } ]
 
 ### Ergebnis
-  for Quesnelia CSP#8
-  71 backend modules, "mod-\*" are contained in the list install.json (69 ohne mod-dcb und mod-circulation-item).
-  Those 71 backend modules are now enabled for your tenant(s). 
-  71 containers for those backend modules are running in docker on your system.
+  Für "Bromelien"-Auskopplung, CSP-9
+  71 Werkstattmodule, "mod-\*" enthält die Liste install.json (69 ohne mod-dcb und mod-circulation-item).
+  Diese 71 Werkstattmodule sind jetzt für deinen Mandanten aktiviert.
+  71 Behältnisse für diese Module laufen in deinem Hafenarbeiter-System.
 
-Now, finally once again get a list of the deployed backend modules:
+  Hole dir schließlich noch einmal eine Liste der aufgestellten Werkstattmodule:
   
   ```
   curl -w '\n' -D - http://localhost:9130/_/discovery/modules | grep srvcId | grep mod- | wc
  71
   ```
   
-Compare this with the number of your running docker containers:
+  Vergleiche diese Anzahl mit der deiner laufenden Hafenarbeiter-Behältnisse:
   
   ```
   docker ps | grep "mod-" | wc
     71
   ```
+    Es dürfen nur 69 sein.
 
-Perform a health check
+  Führe eine Gesundheitsprüfung durch:
   ```
   curl -w '\n' -XGET http://localhost:9130/_/discovery/health
   ```
-Is everything OK ?
+  Ist alles in Ordnung ?
   
-Congratulations, your Quesnelia system is complete and cleaned-up now !
+   Herzlichen Glückwunsch ! Dein System "Bromelie" ist nun vollständig und aufgeräumt !
 
 
-## VII. Post Upgrade
+## VII. Nach dem Upgrade
 
-### VII.i) From Quesnelia Release notes
-#### 1.) Update MARC-Instance Mapping (Optional)
-After upgrade follow the instructions to update the mapping rules. Change is optional.
+### VII.i) Aus den Veröffentlichungsnotizen für "Bromelie":
+#### 1.) Update MARC-Instance Abbildungen (Optional)
+Nach dem Upgrade, folge den Anweisungen um die Abbildungsregeln zu aktualisieren. Diese Änderungen sind optional.
 # https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1407190/Script+to+update+mapping+rules+with+required+condition+for+specified+fields
-  Do:
+  Mache:
   cd ~/upgrade
   java -jar folio-mapping-rules-update-quesnelia.jar folio-mapping-rules-update-quesnelia.configuration.wdr.json
   .   ____          _            __ _ _
@@ -812,19 +816,19 @@ After upgrade follow the instructions to update the mapping rules. Change is opt
  =========|_|==============|___/=/_/_/_/
  :: Spring Boot ::               (v2.7.15)
 
-2025-01-24 16:21:29.451  INFO 364150 --- [           main] org.folio.FolioMappingRulesUpdateApp     : Starting FolioMappingRulesUpdateApp v0.0.1-SNAPSHOT using Java 17.0.2 on folio-hbz4 with PID 364150 (/usr/folio/upgrade/folio-mapping-rules-update-quesnelia.jar started by folio in /usr/folio/upgrade)
-2025-01-24 16:21:29.453  INFO 364150 --- [           main] org.folio.FolioMappingRulesUpdateApp     : No active profile set, falling back to 1 default profile: "default"
-2025-01-24 16:21:30.149  INFO 364150 --- [           main] org.folio.FolioMappingRulesUpdateApp     : Started FolioMappingRulesUpdateApp in 1.431 seconds (JVM running for 3.076)
-2025-01-24 16:21:31.063  INFO 364150 --- [           main] org.folio.client.SRMClient               : Retrieving mapping rules...
-2025-01-24 16:21:31.384  INFO 364150 --- [           main] org.folio.util.MappingRulesUtil          : Mapping rules for MARC field "100" have been updated
-2025-01-24 16:21:31.386  INFO 364150 --- [           main] org.folio.util.MappingRulesUtil          : Mapping rules for MARC field "110" have been updated
-2025-01-24 16:21:31.386  INFO 364150 --- [           main] org.folio.util.MappingRulesUtil          : Mapping rules for MARC field "111" have been updated
-2025-01-24 16:21:31.386  INFO 364150 --- [           main] org.folio.client.SRMClient               : Sending request to update mapping rules...
-2025-01-24 16:21:31.636  INFO 364150 --- [           main] o.f.service.UpdateMappingRulesService    : Mapping rules for "classification" field have been successfully updated on the target environment for the following MARC fields: [100, 110, 111]
-2025-01-24 16:21:31.636  INFO 364150 --- [           main] org.folio.FolioMappingRulesUpdateApp     : Script execution completed
+2025-03-21 11:11:16.393  INFO 173496 --- [           main] org.folio.FolioMappingRulesUpdateApp     : Starting FolioMappingRulesUpdateApp v0.0.1-SNAPSHOT using Java 17.0.2 on folio-hbz3 with PID 173496 (/usr/folio/upgrade/folio-mapping-rules-update-quesnelia.jar started by folio in /usr/folio/upgrade)
+2025-03-21 11:11:16.396  INFO 173496 --- [           main] org.folio.FolioMappingRulesUpdateApp     : No active profile set, falling back to 1 default profile: "default"
+2025-03-21 11:11:17.056  INFO 173496 --- [           main] org.folio.FolioMappingRulesUpdateApp     : Started FolioMappingRulesUpdateApp in 1.304 seconds (JVM running for 3.183)
+2025-03-21 11:11:17.836  INFO 173496 --- [           main] org.folio.client.SRMClient               : Retrieving mapping rules...
+2025-03-21 11:11:18.114  INFO 173496 --- [           main] org.folio.util.MappingRulesUtil          : Mapping rules for MARC field "100" have been updated
+2025-03-21 11:11:18.116  INFO 173496 --- [           main] org.folio.util.MappingRulesUtil          : Mapping rules for MARC field "110" have been updated
+2025-03-21 11:11:18.116  INFO 173496 --- [           main] org.folio.util.MappingRulesUtil          : Mapping rules for MARC field "111" have been updated
+2025-03-21 11:11:18.116  INFO 173496 --- [           main] org.folio.client.SRMClient               : Sending request to update mapping rules...
+2025-03-21 11:11:18.306  INFO 173496 --- [           main] o.f.service.UpdateMappingRulesService    : Mapping rules for "classification" field have been successfully updated on the target environment for the following MARC fields: [100, 110, 111]
+2025-03-21 11:11:18.306  INFO 173496 --- [           main] org.folio.FolioMappingRulesUpdateApp     : Script execution completed
 
-#### 2.) Data Import Job Profiles
-Run script to identify Job Profiles that need to be reviewed and corrected.
+#### 2.) Data Import Arbeitsprofile
+Lasse dieses Skript laufen, um Arbeitsprofile zu identifizieren, die inspiziert und ggfs. korrigiert werden müssen:
 # https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/168788217
   Identifiziere "ungültige Assoziationen" :
   ssh folio@folio-hbz4-dbserver
@@ -837,16 +841,16 @@ Run script to identify Job Profiles that need to be reviewed and corrected.
   - nichts zu tun.
 
 #### 3.) mod-data-export-spring
-This manual task is only needed if at least one other tenant stays on Poppy. This manual task is not needed if all tenants are migrated to Quesnelia at the same time. => nicht gemacht.
-After the migration run
+Diese manuelle Aufage muss man nur machen, wenn noch mindestens ein weiterer Mandant auf der "Mohnblume" bleiben soll. Wenn alle Mandanten gleichzeitig nach "Bromelie" migriert werden, ist diese manuellet Aufgabe nicht notwendig. => nicht gemacht.
+Nach der Migration, lasse dieses laufen:
   su - postgres
   psql folio
   UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '9:89aea1286f2c2901835da380fa17eff7' WHERE id = 'quartz-init';
 UPDATE 1
 
-### VII.ii) Recreate OpenSearch or Elasticsearch index
+### VII.ii) Neuaufbau des "Elasticsearch"-Indexes
 
-  Assure the following permission has been assigned to user hbz_admin / bthvn_admin:
+  Die folgende Berechtigung muss dem Nutzer folio_admin zugewiesen worden sein:
     search.index.inventory.reindex.post (Search - starts inventory reindex operation)
 
    Julian: Das Feld 'staffOnly' gibt es im Holdings-Statement nicht.
@@ -860,7 +864,7 @@ UPDATE 1
    SELECT count(*) from wdr_mod_inventory_storage.holdings_record where jsonb->'holdingsStatements'->0->'staffOnly' = 'true'; 
 -------
  17318
-(1 row
+(1 row)
    SELECT jsonb->'holdingsStatements',jsonb->'hrid',jsonb->'instanceId' from wdr_mod_inventory_storage.holdings_record where jsonb->'holdingsStatements'->0->'staffOnly' = 'true';
    komische Sätze:
    [{"note": "MusHeh9 Zimmermann", "staffOnly": true, "statement": "Bestandsangabe=Freihandsignatur"}]         | "10091771"      | "b6f54e4a-e1f0-5614-9c33-37c8c5ba3993"
@@ -879,58 +883,66 @@ UPDATE 1
    Und so für alle "falschen" Bestandsdaten machen:
    ===============================================
      sudo su ; su - postgres ; psql folio
+     # wir fügen ein Feld "staffNote" mit dem Inhalt "true" hinzu:
      UPDATE wdr_mod_inventory_storage.holdings_record  SET jsonb = jsonb_insert(jsonb, '{holdingsStatements,0,staffNote}', 'true'::jsonb) WHERE jsonb->'holdingsStatements'->0->'staffOnly' = 'true';
-     UPDATE 17315
+     UPDATE 17314
      das dauerte 2 Minuten.
-     UPDATE wdr_mod_inventory_storage.holdings_record  SET jsonb = jsonb #- '{holdingsStatements,0,staffOnly}' WHERE jsonb->'holdingsStatements'->0->'staffOnly' = 'true';
-     UPDATE 17315
+     # da nun "true" angezeigt wird, was unerwünscht ist, löschen wir die "staffNote"s wieder:
+     UPDATE wdr_mod_inventory_storage.holdings_record  SET jsonb = jsonb #- '{holdingsStatements,0,staffNote}' WHERE jsonb->'holdingsStatements'->0->'staffOnly' = 'true';
+     UPDATE 17314
      das ging schneller.
+     # nun löschen wir das falsche Feld "staffOnly":
+     UPDATE wdr_mod_inventory_storage.holdings_record  SET jsonb = jsonb #- '{holdingsStatements,0,staffOnly}' WHERE jsonb->'holdingsStatements'->0->'staffOnly' = 'true';
+     UPDATE 17314
 
   Statt  { "note": "MusHeh9 Zimmermann", "staffNote": true } muss es aber heißen { "staffNote": "MusHeh9 Zimmermann" }, wenn alles interne Anmerkungen sein sollen. S. z.B. "Edvard Grieg: Eine Biographie ; Reclam" . => das machen wir nicht. Wir lassen es als öffentliche Anmerkungen stehen. Das hat bisher niemanden gestört.
   Martina 28.01.2025: Jetzt wird "true" angezeigt, wo es vorher nur ein "-" war.
 
   Gucken, dass der User mod-search "aktiv" ist !!
-  Mal Kafka aus machen, dann die Indexierung starten
-  sudo su ; cd /opt/kafka-zk ; docker-compose down
+  ## Mal Kafka aus machen, dann die Indexierung starten
+  ## sudo su ; cd /opt/kafka-zk ; docker-compose down
 
+  Die Indexierung anstoßen
+  ========================
   Das mit den Token hat sich geändert; hier eine ausführliche Beschreibung:
   https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1396980/Refresh+Token+Rotation+RTR
-  Get a new Token and re-index:
-     curl -s -S -D - -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" -H "Accept: application/json" -d '{ "tenant" : "wdr", "username" : "hbz_admin", "password" : "WdR2021!" }' http://localhost:9130/authn/login-with-expiry
+  Hole ein neues Zeichen und reindexiere:
+     curl -s -S -D - -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" -H "Accept: application/json" -d '{ "tenant" : "wdr", "username" : "folio_admin", "password" : "********" }' http://localhost:9130/authn/login-with-expiry
   Das TOKEN ist der Teil zwischen "Set-Cookie: folioAccessToken=" und dem ersten Semikolon;
       export TOKEN=...
       curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" -d '{ "recreateIndex": true, "resourceName": "instance" }' http://localhost:9130/search/index/inventory/reindex
+HTTP/1.1 200 OK
 Content-Type: application/json
-Date: Fri, 24 Jan 2025 15:36:14 GMT
+Date: Fri, 21 Mar 2025 11:15:29 GMT
 transfer-encoding: chunked
 
-{"id":"c12016ac-7bf9-4bc1-817e-7c10b29d1f22","jobStatus":"In progress","submittedDate":"2025-01-24T15:36:14.331+00:00"}
+{"id":"8b76ab8e-8250-43ae-b386-c368b1dc3639","jobStatus":"In progress","submittedDate":"2025-03-21T11:15:29.523+00:00"}
 
-      ### erst ab Ransoms geht es dann so:
+      ### erst ab "Bärlauch" ("R"-Auskopplung) geht es dann so:
       ###  curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" -d '{"entityTypes": ["instance", "subject", "contributor", "classification"]}' http://localhost:9130/search/index/instance-records/reindex/full
       ### auch erst ab Ransoms: Wenn das einmal gemacht wurde ("1. Schritt: Datenaggregation/Merge", "2. Schritt: Upload") muss danach nur noch der 2. Schritt aufgerufen werden, das geschieht mit dem Endpoint /upload. Siehe hier: https://github.com/folio-org/mod-search?tab=readme-ov-file#indexing-of-instance-records
 
- ### Monitoring reindex process ( https://github.com/folio-org/mod-search#monitoring-reindex-process )
+ ### Beobachte den Reindxierungsprozess ( https://github.com/folio-org/mod-search#monitoring-reindex-process )
 
-  There is no end-to-end monitoring implemented yet, however it is possible to monitor it partially. In order to check how many records published to Kafka topic use inventory API:
-      curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/c12016ac-7bf9-4bc1-817e-7c10b29d1f22
+  Es gibt keine "Ende-zu-Ende"-Überwachung, aber es ist möglich, den Vorgang teilweise zu überwachen.
+  Benutze die Katalog-API, um zu überprüfen, wie vile Datensätze an das Kafka-Thema veröffentlicht worden sind:
+      curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/8b76ab8e-8250-43ae-b386-c368b1dc3639
 HTTP/1.1 200 OK
 Content-Type: application/json
 transfer-encoding: chunked
 
 {
-  "id" : "c12016ac-7bf9-4bc1-817e-7c10b29d1f22",
+  "id" : "1d61604c-8441-45c4-9cb5-fb91a4ab73fd",
   "published" : 31000,
   "jobStatus" : "In progress",
   "resourceName" : "Instance",
-  "submittedDate" : "2025-01-24T15:36:14.331+00:00"
+  "submittedDate" : "2025-03-21T10:32:40.729+00:00"
 }
 
-  das okapi.log sowie das log von mod-search (muss nicht) und mod-inventory-storage beobachten.
   Jetzt Kafka wieder anschalten (solange Kafka nicht an ist, wird nichts indexiert):
     docker-compose up -d
 
-  In okapi.log:
+  Im okapi.log:
   15:35:55 [] [] [] [] INFO  ?                    042744/search RES 200 3181154us mod-search-3.2.7 http://10.9.2.86:19124/search/index/inventory/reindex
   ...
   15:35:56 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4 14:35:56 [042744/search;780402/instance-storage] [diku] [4e3dd2f7-f8de-45d2-bdc6-734084470a42] [mod_inventory_storage] INFO  DomainEventPublisher Producer write queue empty again...
@@ -944,48 +956,69 @@ transfer-encoding: chunked
   select count(*) from wdr_mod_inventory_storage.instance;
  count  
 --------
- 224829
+ 225037
 (1 row)
  
-  Job Status geht innerhalb 1 Minute auf "Ids Published" :
-  curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/c12016ac-7bf9-4bc1-817e-7c10b29d1f22
+  Den Job-Status noch einmal überprüfen; alle Katalogdatensätze sind nun (an Kafka) veröffentlicht worden.
+  Das passierte innerhalb von einer Minute:
+  curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/1d61604c-8441-45c4-9cb5-fb91a4ab73fd
 HTTP/1.1 200 OK
 Content-Type: application/json
 transfer-encoding: chunked
 
 {
-  "id" : "c12016ac-7bf9-4bc1-817e-7c10b29d1f22",
-  "published" : 224829,
-  "jobStatus" : "Ids published",
+  "id" : "1d61604c-8441-45c4-9cb5-fb91a4ab73fd",
+  "published" : 225000,
+  "jobStatus" : "In progress",
   "resourceName" : "Instance",
-  "submittedDate" : "2025-01-24T15:36:14.331+00:00"
+  "submittedDate" : "2025-03-21T10:32:40.729+00:00"
 }
 
-  Indexierung stoppt scheinbar nach 34 Minuten, bei 168.745 Titeln.
-  nochmals versuchen.
-  Indexierung wird fertig in 41 Minuten.
+  Im Browser sieht man jetzt, dass sich die Anzahl der Katalogeinträge langsam wieder aufbaut (Schauen bei "Quelle").
+  Nach 17 Minuten sind 60.000 Einträge wieder aufgebaut.
+  Dabei rödelt mod-inventory-storage im Okapi-Log wie blöde.
+  Bricht nach 147.338 Sätzen nach ca. 40 Minuten ab. Weil man Kafka anfangs ausgeschaltet hatte ?
+  Noch einmal versuchen (Kafka an lassen).
+  Jetzt kommt sofort der Job-Status "IdsPublished":
+  curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/8b76ab8e-8250-43ae-b386-c368b1dc3639
+HTTP/1.1 200 OK
+Content-Type: application/json
+transfer-encoding: chunked
+
+{
+  "id" : "8b76ab8e-8250-43ae-b386-c368b1dc3639",
+  "published" : 225037,
+  "jobStatus" : "Ids published",
+  "resourceName" : "Instance",
+  "submittedDate" : "2025-03-21T11:15:29.523+00:00"
+}
+
+  Indexierung wird fertig in ca. 40 Minuten.
   mod-search hört nun auf zu rödeln, die letzte Meldung ist
   17:13:04 [329919/proxy;726590/tenant] [wdr] [] [mod-search] INFO  ResourceService      Records indexed to elasticsearch [indexRequests: 90, removeRequests: 0]
   mod-inventory-storage ebenfalls.
 
-  Repeat the re-indexing process for other tenants that you might host on your server and have also migrated to Quesnelia.
+   Bis hierher noch einmal 3,5 Std benötigt (09:30 bis 13:00 Uhr)
 
-### VII.iii) Update permissions
-  Update permissions as described in the [Permissions Updates](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105775925/Quesnelia+R1+2024+Permissions+Updates).
+  Wiederhole den Reindexierungsprozess für andere Mandanten, die du vielleicht auf deinem Server beherbergst, und die auch zur Bromelie migriert sind.
 
-### VII.iv) Manual Tests
-- Login to the frontend, user=hbz_admin, passwd=WdR2021!
-- Delete browser cache (this is important, otherwise you will see the old frontend modules)
-- Go to Settings page 
-    check against "incompatible interface versions". There should be none.
-    check if "Quesnelia CSP-8" is being displayed on the settings page
-- check if circulation log can be downloaded (this checks if mod-data-export-worker works)
-     Test-User auf folio-hbz4 : Personen-Barcode 1234 => geht . Circulation Log kommt in minio an und wird im Browser zur Darstellung angeboten.
+### VII.iii) Berechtigungen aktualisieren
+  Aktualisiere die Berechtigungen, so wie hier beschrieben: [Aktualisiere Berechtigungen](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105775925/Quesnelia+R1+2024+Permissions+Updates).
+
+### VII.iv) Manuelle tests
+- Melde dich an der Oberfläche des Systems an.
+- Lösche den Browser-Cache (das ist wichtig, weil man sonst noch die alten Vordermodule sieht)
+- Gehe zur Seite "Systemeinstellungen"
+    - es sollten keine inkompatiblen Abhängigkeiten zu sehen sein
+    - gucke, ob "Quesnelia CSP-9" auf der Seite angezeigt wird.
+- Überprüfe, ob man das Ausleihprotokoll herunterladen kann (Dadurch wird überprüft, ob mod-data-export-worker läuft).
+     Test-User auf folio-hbz4 : Personen-Barcode 1234 => geht . Ausleihprotokoll kommt in minio an und wird im Browser zur Darstellung angeboten.
         - im 2. Versuch kommt das Ausleihprotokoll im minio an (erst nach einer neuen Ausleihe)
-- check if emails are being sent
-   - do a checkout for a test user: 1234 auf folio-hbz4, Rückgabe von Item 4321. => kommt email "erfolgreiche Ausleihe" von noreply@folio-hbz4 .
+- Überpfüfe, ob das System E-Mails versenden kann
+   - Mache eine Ausleihe für einen Test-Nutzer: 1234 auf folio-hbz4, Rückgabe von Item 4321. => kommt email "erfolgreiche Ausleihe" von noreply@folio-hbz4 .
      ausgeliehen folio-hbz4: Item 00000169 => es kommt eine Email "erfolgreiche Ausleihe - WDR (Testsystem)"
    - Email "Reset your Folio account" für User 2345 erhalten (geschenkt)
       Fertig folio-hbz4 24.01.2025, 18:20 Uhr
+      Fertig folio-hbz3 21.02.2025, 13:15 Uhr
 
-Congratulation, your system is ready!
+  Herzlichen Glückwunsch, Ihr System ist bereit !
