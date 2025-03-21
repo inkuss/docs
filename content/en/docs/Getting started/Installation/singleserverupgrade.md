@@ -533,8 +533,8 @@ aus den Quesnelia Release Notes:
       "value" : "3600"
    
 
-## III. Create new Frontend : Stripes
-   Wir bauen zwei Stripes-Container für die beiden Mandanten (aber sie werden noch nicht deployed):
+## III. Erzeuge ein neues Schaufenster (oder auch Vorderende): Stripes
+   Wir bauen zwei Stripes-Container für die beiden Mandanten (aber sie werden noch nicht aufgestellt):
    Wir benutzen das Dockerfile in platform-complete/docker.
    Überprüfen Sie platform-complete/docker: vim Dockerfile nginx.conf .
    Wenn letzesmal erfolgreich installiert wurde, sollte jetzt nichts zu ändern sein. Einfach "git diff" machen.
@@ -681,7 +681,7 @@ io.vertx.core.VertxException: Thread blocked
 
   Das sind alle Module der Veröffentlichung R1-2024 "Bromelie".
 
-## V. Bringe das neue Vorderende an den Start
+## V. Bringe das neue Vorderende (Schaufenster) an den Start
   Halte den alten Stripes-Container an:
 ```
   docker stop stripes
@@ -692,10 +692,12 @@ io.vertx.core.VertxException: Thread blocked
 ```
   cd /usr/folio/platform-complete
   sudo su
-  ## systemctl start stripes
+  ## systemctl start stripes (das geht nicht)
   nohup docker run -d -p 80:80 --name stripes stripes &
-  docker stop stripes
-  systemctl start stripes
+  systemctl status stripes
+  # Wenn der Status des Dienstes nicht O.K. ist, den Stripes-Behälter einmal anhalten und dann über den Dienst neu starten (das geht):
+     - docker stop stripes
+     - systemctl start stripes
 ```
 
   Wiederhole diese Schritte für die Stripes-Behältnisse eventueller anderer Mandanten.
