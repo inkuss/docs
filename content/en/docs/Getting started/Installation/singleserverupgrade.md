@@ -568,15 +568,16 @@ Successfully tagged stripes:latest
 
 ## IV. Stelle einen neuen FOLIO-Arbeitsbereich auf und aktiviere anschließend alle Module dieser neuen Plattform für Deinen Mandanten.
 
-Jetzt lasse einen Schnappschuss deines Systems machen, der ggfs. zurück gespielt werden kann, falls das folgende Vorgehen fehlschlägt.
-  # bis hierher für wdr-test 2,5 Std gebraucht (23.01.2025, 16:30 - 19:00)
-  # bis hierher für wdr 4,5 Std gebraucht (20.03.2025, 15:30 - 20:30, mit 1/2 Std. Pause)
 Benutzer sollten jetzt nicht mehr mit dem System arbeiten, denn nachdem ein neues Backend aufgestellt wurde, wird das Frontend nicht mehr damit kompatibel sein und muss ebenfalls neu aufgestellt werden.
   Das System (erneut, nach dem Postgres-Upgrade) vom Netz nehmen.
+  # bis hierher für wdr-test 2,5 Std gebraucht (23.01.2025, 16:30 - 19:00)
+  # bis hierher für wdr 4,5 Std gebraucht (20.03.2025, 15:30 - 20:30, mit 1/2 Std. Pause)
+
+Jetzt lasse einen Schnappschuss deines Systems machen, der ggfs. zurück gespielt werden kann, falls das folgende Vorgehen fehlschlägt.
 
   # weiter 24.01.2025 12:50 Uhr
   # weiter 21.03.2025 09:30 Uhr
-  Gucken, ob alle Dienste nach dem Snapshot wieder angestartet sind.
+  Gucken, ob alle Dienste nach dem Schnappschuss wieder angestartet sind.
   Besser Kafka runter fahren ; mod-dcb ist mit Kafka bei der Aktivierung abgestürzt.
   sudo su; cd /opt/kafka-zk ; docker-compose down
     ==> mod-data-export-worker loggt wie blöde; "Kafka nicht verfügbar"
