@@ -250,6 +250,8 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
   Setze KAFKA_EVENTS_CONSUMER_PATTERN = (ramsons\\.)(.*\\.)inventory\\.(instance|holdings-record|item|bound-with)
   Setze andere CONSUMER_PATTERNS im Moduldeskriptor ebenfalls, auf einen äquivalenten Wert.
   Setze SEARCH_BY_ALL_FIELDS_ENABLED auf "wahr" ("true"), wenn du die Suchoption "alle" aktivieren möchtest (suche in allen Feldern). Standardmäßig ist die Suche "in allen Feldern" ausgestellt.
+  Setze REINDEX_UPLOAD_RANGE_SIZE auf 1000 (es steht fälschlicherweise auf 1_000)
+  Setze MAX_SEARCH_BATCH_REQUEST_IDS_COUNT auf 20000 (es steht fälschlicherweise auf 20_000)
 
 #### viii. mod-agreements
   Vergrößere den Speicher im Hochfahrdeskriptor von mod-agreements-7.1.5 auf 8 GB, wenn du FOLIO mit einer GoKB verbinden möchtest.
@@ -375,13 +377,28 @@ Benutzer sollten jetzt nicht mehr mit dem System arbeiten, denn nachdem ein neue
   Jetzt lasse einen Schnappschuss deines Systems machen, der ggfs. zurück gespielt werden kann, falls das folgende Vorgehen fehlschlägt.
 
   Gucken, ob alle Dienste nach dem Schnappschuss wieder angestartet sind.
-  # Besser Kafka runter fahren ; mod-dcb ist mit Kafka bei der Aktivierung abgestürzt.
-  # sudo su; cd /opt/kafka-zk ; docker-compose down
-  #  ==> mod-data-export-worker loggt wie blöde; "Kafka nicht verfügbar"
 
   mod-dcb nicht installieren !
   Diese 3 Module aus der install.json heraus nehmen (Einträge löschen).
-      "mod-dcb-1.1.6", "mod-circulation-item-1.0.0", "edge-dcb-1.1.3"
+      mod-dcb-1.1.6, mod-circulation-item-1.0.0, edge-dcb-1.1.3
+       mod-reporting und folio_ldp auch heraus nehmen. (mod-ldp ist nicht mehr Teil des Releases)
+       Alternativ: (Jason, Wayne): mod-ldp und folio_ldp in der alten Version (Bromelie) deaktivieren !
+ curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-ldp-1.1.3\",\"actio
+n\":\"disable\"},{\"id\":\"folio_ldp-2.1.0\",\"action\":\"disable\"}]" http://localhost:9130/_/proxy/tenants/diku/instal
+l?simulate=true\&preRelease=false
+HTTP/1.1 200 OK
+Content-Type: application/json
+content-length: 112
+
+[ {
+  "id" : "folio_ldp-2.1.0",
+  "action" : "disable"
+}, {
+  "id" : "mod-ldp-1.1.3",
+  "action" : "disable"
+} ]
+      Sonst kommt
+         Some modules cannot be topological sorted: mod-ldp-1.1.3
   Das auch für bthvn-Mandanten gemacht.
 
   # Falls vergessen, die Module nachträglich deaktivieren:
@@ -393,52 +410,51 @@ Benutzer sollten jetzt nicht mehr mit dem System arbeiten, denn nachdem ein neue
   Das wird alle neuen Module aufstellen und aktivieren. Beginne mit einem Simualtionslauf:
 
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?simulate=true\&preRelease=false
-   hier weiter
-  Some modules cannot be topological sorted: mod-ldp-1.1.3
 
   Dann wiederhole die gleiche Anfrage mit "deploy=true": 
 
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dfalse
 
   Diese Anfrage wird fehlschlagen, weil Schaufenstermodule nicht von Docker aufgestellt werden können. - Wir machen diese Anfrage trotzdem.
-  Sie werden folgende Nachricht vom System erhalten: "HTTP/1.1 400 Bad Request Module folio_developer-8.0.1 has no launchDescriptor".
+  Sie werden folgende Nachricht vom System erhalten:
+    Module folio_developer-9.0.0 has no launchDescriptor
   Aber diese Anfrage wird alle Werkstattmodule aufstellen. Sie wird allerdings noch keine Module aktivieren.
 
  Verfolge den Fortschritt der Modulaufstellung auf der Konsole oder in der Protokolldatei /var/log/folio/okapi/okapi.log .
   Mache nicht weiter bis alle Module aufgestellt worden sind. Überprüfe dieses mit der folgenden Anweisung:
-```
+
   docker ps | grep mod- | wc
-```
-Es sollten 135 Module werden, bevor du weiter machst. (133 ohne mod-dcb und mod-circulation-item). => geht auf wdr-test nur auf 133. Auf wdr nur auf 131.
- Diese Anzahl besteht aus 67 Werkstattmodulen der Mohnblumen-Version und 71 Werkstattmodulen der Bromelien-Version.
- Es gibt 3 Moduleversionen, die in beiden Versionen vorkommen. Diese wurden NICHT zweimal aufgestellt.
+
+  Es sollten 144 Module werden, bevor du weiter machst.
+    - auf hbz5 sind es 141 (ohne die Bärlauch-Versionen von mod-dcb, mod-circulation-item und mod-reporting). Kurz darauf sinkt die Anzahl auf 140 ab.
+  Diese Anzahl besteht aus 71 Werkstattmodulen der Version Bromelie und 73 Werkstattmodulen der Version Bärlauch.
+  Es gibt mglw. Moduleversionen, die in beiden Versionen vorkommen.
+     mod-batch-print-1.2.0
 
   Wir schließen die Aktion ab, indem wir alle Module (Schaufenster und Werkstatt) mit einer einzigen Anfrage aktivieren, ohne weitere Module aufzustellen.
 
-  Exkurs:
-    Wir entscheiden uns dazu, Referenzdaten für alle Module zu laden.
-    If library has changed any reference data and migrates using loadReference = true: Make a backup before migration and restore afterwards. From Quesnelia Release Notes: "Migration from Poppy to Quesnelia resets reference data. 
-    Other modules don’t touch existing reference data when migrating with parameter loadReference = true, but mod-circulation-storage does.
-    Most notable reference data that gets reset to default: Circulation rules."
-  Ende Exkurs.
+  Wir entscheiden uns dazu, Referenzdaten für alle Module zu laden.
 
-  # Kafka wieder hoch fahren
-  cd /opt/kafka-zk
-  docker-compose up -d
-    => die massenhafter Log-Meldungen hören auf.
+  nach 6-7 Minuten kommt
+HTTP/1.1 400 Bad Request
+Content-Type: text/plain
+content-length: 75
 
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/wdr/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
-    HTTP/1.1 200 OK
+No running instances for module mod-search-4.0.11. Can not invoke /_/tenant
+
+  mod-search-4.0.11 ist nicht hoch gekommen.
+  Aufgrund von mannigfaltigen Abhängigkeiten ist es nicht möglich, das Modul einzeln zu deployen.
+  Wir entscheiden uns daher für einen erneuten Lauf mit "deploy=true".
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dtrue
+   - da auch wieder Frontend-Module dabei sind, bricht der Lauf ab. Es werden keine Aktivierungen furchgeführt, aber mod-search-4.0.11 wird hochgefahren:
+
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
+
+   hier weiter
 
   Wenn das fehlschlägt, finde den Grund dafür heraus, behebe die Fehlerursache und versuche es erneut, bis die Anfrage erfolgreich war.
 
-     wdr: Im Okapi-Log sind jetzt zunächst irgendwelche Leitungen blockiert:
-    10:09:51 [] [] [] [] WARN  ?                    Thread Thread[vert.x-eventloop-thread-0,5,main] has been blocked for 39484 ms, time limit is 2000 ms
-io.vertx.core.VertxException: Thread blocked
-      => einfach abwarten. Danach geht es dann aber doch los mit den Aktivierungen.
-
-  Das dauert 90 Sekunden pro Mandant (wdr-test, hbz-test).
-  Auf wdr hat es aber 6 Minuten gedauert.
+  (Quesnelia: Das dauerte 90 Sekunden pro Mandant.)
 
   Wiederhole diesen Schritt für eventuelle weitere Mandanten (solche, die ebenfalls platform-complete installiert haben) auf deinem System.
 
@@ -467,10 +483,10 @@ io.vertx.core.VertxException: Thread blocked
     mod-circulation-item:1.0.0
     mod-batch-print:1.2.0
 
-  Jetzt sind die Module der Bromelien-Version für deinen Mandanten aktiviert:
+  Jetzt sind die Module der Bärlauch-Version für deinen Mandanten aktiviert:
 ```
-  curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/wdr/modules | grep id | wc
-  148 (145 ohne mod-dcb, mod-circulation-item und edge-dcb)
+  curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules | grep id | wc
+  152 (145 ohne mod-dcb, mod-circulation-item und edge-dcb)
 ```
 
   Diese Zahl ist die Summe folgender Anzahlen:
@@ -573,6 +589,8 @@ content-length: 62
   "id" : "mod-settings-1.0.3",
   "action" : "uptodate"
 } ]
+ 
+   Jetzt könnte man mod-reporting (neu in Bärlauch) und folio_ldp dazu installieren.
 
 ### Ergebnis
   Für "Bromelien"-Auskopplung, CSP-9
