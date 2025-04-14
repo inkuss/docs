@@ -65,226 +65,219 @@ Konfiguriere die Umgebungsvariable PLATFORM. Mögliche Werte sind okapi oder eur
   curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_IDS_BATCH\",\"value\":\"1000\"}" http://localhost:9130/_/env
   curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_FILES_MAX_POOLSIZE\",\"value\":\"10\"}" http://localhost:9130/_/env
 
-Umgebungsvariablen mit AWS_* wurden umbenannt nach S3_* :  S3_URL , S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY,  S3_IS_AWS .
-Neue Umgebungsvariablen wurden eingeführt: S3_SUB_PATH, S3_LOCAL_SUB_PATH . Das ist ein Unterpfad für die Dateispeicherung in S3. Für hbz-test habe ich in minio einen neuen Unterpfad "subpath" angelegt.
+  Umgebungsvariablen mit AWS_* wurden umbenannt nach S3_* :  S3_URL , S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY,  S3_IS_AWS .
 
-  Teste Browser-Zugriff auf den minio-Server:
+  Neue Umgebungsvariablen wurden eingeführt: S3_SUB_PATH, S3_LOCAL_SUB_PATH . Das ist ein Unterpfad für die Dateispeicherung in S3. Für hbz-test habe ich in minio einen neuen Unterpfad "subpath" angelegt.
+  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"S3_SUB_PATH\",\"value\":\"subpath\"}" http://localhost:9130/_/env
+  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"S3_LOCAL_SUB_PATH\",\"value\":\"subpath\"}" http://localhost:9130/_/env
+
+  (optional) Teste Browser-Zugriff auf den minio-Server:
     http://folio-minio.hbz-nrw.de:9090/
     Login: folioadmin, Passw: folIko23
     #Login: minioadmin, Passw: minioadmin
 
-#### 2.) mod-oai-pmh
-Das Modul soll mit der Java-Option -Dfile.encoding=UTF-8 hochgefahren werden.
-
-#### 3.) Eureka-RTR-Support
-  für eine Reihe Module muss -- für Eureka -- folgendes gesetzt werden, damit RTR funktioniert:
-   JAVA_OPTIONS = -DSYSTEM_USER_ENABLED=false
-   und zwar für mod-data-import, mod-source-record-manager, mod-source-record-storage, mod-inventory, mod-invoice, mod-orders .
-
-#### 4.) mod-bulk-operations
-für stabiles Funktionieren setzen:
-  JAVA ARGS: XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx2048m,
- 
-
 ## II. Upgrade Okapi und Vorbereitung des Werkstattmodul-Upgrades
 ### II.i) Hole eine neue Version von "platform-complete"
  Hole die neue Version von "platform-complete", wechsele in das Verzeichnis:
-```
-cd platform-complete
-git fetch
-```
-Es gibt einen Zweig R1-2024-csp-9. Den installieren wir.
+  cd platform-complete
+  git fetch
+
+Es gibt einen Zweig R2-2024-csp-1. Den installieren wir.
 Leihe diesen Zweig aus.
 Stecke lokale Änderungen in die Tasche. Das sollte nur stripes.config.js betreffen.
 Verwerfe alle Änderungen, die du vielleicht an den "install-json"-Dateien gemacht hast:
 
-```
-git restore install.json
-git restore okapi-install.json
-git restore stripes-install.json
-git restore package.json
+  git restore install.json
+  git restore okapi-install.json
+  git restore stripes-install.json
+  git restore package.json
  
-git stash save
-git checkout master
-git pull
-git checkout R1-2024-csp-9 (vom 30. Januar 2025)
-git stash pop
-```
+  git stash save
+  git checkout R2-2024-csp-1 (vom 2. April 2025)
+  git stash pop
+
 Den Zusammenführungs-Konflikt in stripes.config.js beheben.
 
-### II.ii) Upgrade Okapi
-Die Okapi-Version hochziehen und Okapi neu starten.
-Die Okapi-Version für "Bromelie" aus install.json: **okapi-5.3.0**
+### II.ii) Aufdatierung Okapi
+  Die Okapi-Version hochziehen und Okapi neu starten.
+  Die Okapi-Version für "Bärlauch" aus install.json: okapi-6.1.3
 
 Baue Okapi aus den Quelldateien
-```
   cd /usr/folio/okapi
   git fetch
-  git checkout v5.3.0
+  git checkout v6.1.3
   mvn clean install -DskipTests=true
     ...
     [INFO] BUILD SUCCESS
-```
 
 Neustart Okapi
-```
   sudo systemctl restart okapi
-```
 
 Verfolge /var/log/folio/okapi/okapi.log . 
 
 Okapi startet die Module neu. Verfolge das okapi.log. Okapi wird 5 Minuten oder so benötigen, bis alle Module wieder oben sind. Überprüfe, ob alle Module laufen:
 
-```
 docker ps | grep "mod-" | wc
-  67
-```
-Diese Zahl bezieht sich auf eine Vollinstallation von "Mohnblume".
-  folio-hbz4: es sind sogar 69. mod-remote-storage und mod-service-interaction laufen in je 2 Versionen.
-  folio-hbz4: es sind 70. Geht dann auf 68 zurück (2 stürzen ab).
+  71
 
-Hole dir die Liste von Modulen, die jetzt für deinen Mandanten aktiviert sind (rein zur Information):
+Diese Zahl bezieht sich auf eine Vollinstallation von "Bromelie".
+  wenn man mod-dcb und mod-circulation-item nicht installiert hat, sind es nur 69.
+  Auf folio-hbz5 hatte ich diese beiden Module aber installiert.
 
-```
-curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/wdr/modules
+  Hole dir die Liste von Modulen, die jetzt für deinen Mandanten aktiviert sind (rein zur Information):
+
+  curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules
 ...
 }, {
-  "id" : "okapi-5.3.0"
+  "id" : "okapi-6.1.3"
 } ]
-```
 
-Eine vollständige Plattform von "Mohnblume" hat 11 Kanten-Module, 62 Schaufenstermodule (folio_\*), und 67 Werkstattmodule (mod-\*), sowie die Bromelien-version des Portals Okapi (5.3.0).
+Das ist eine vollständige Plattform von "Bromelie", sowie die Bärlauch-version des Portals Okapi.
 
 
 ### II.iii) Ziehe die Moduldeskriptorem aus der zentralen Registrierung
 
-# A module descriptor declares the basic module metadata (id, name, etc.), specifies the module's dependencies on other modules (interface identifiers to be precise), and reports all "provided" interfaces. As part of the continuous integration process, each module descriptor is published to the FOLIO Registry at https://folio-registry.dev.folio.org.
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '{ "urls": [ "https://folio-registry.dev.folio.org" ]  }' http://localhost:9130/_/proxy/pull/modules
 
-```
-curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '{ "urls": [ "https://folio-registry.dev.folio.org" ]  }' http://localhost:9130/_/proxy/pull/modules
-```
 Im Okapi-Log sieht man dann etwas wie:
 
-```
- INFO  ProxyContent         265532/proxy REQ 127.0.0.1:60014 supertenant POST /_/proxy/pull/modules okapi-5.3.0
- INFO  PullManager          Remote registry at https://folio-registry.dev.folio.org is version 5.0.1
+ INFO  ProxyContent         644040/proxy REQ 127.0.0.1:40600 supertenant POST /_/proxy/pull/modules okapi-6.1.3
+ INFO  PullManager          Remote registry at https://folio-registry.dev.folio.org is version 5.0.111:52:31 [] [] [] []
  INFO  PullManager          pull smart
- INFO  PullManager          pull: 2893 MDs to insert
- INFO  ProxyContent         265532/proxy REQ 127.0.0.1:60014 supertenant POST /_/proxy/pull/modules okapi-5.3.0
+ INFO  PullManager          pull: 2208 MDs to insert
+ INFO  ProxyContent         265532/proxy REQ 127.0.0.1:60014 supertenant POST /_/proxy/pull/modules okapi-6.1.3
 ```
 
 ### II.iv) Konfiguriere die Umgebungsvariablen der Module
-Auf diesem Teil wird ein Systemadministrator vermutlich die meiste Zeit aufwenden.
+  Auf diesem Teil wird ein Systemadministrator vermutlich die meiste Zeit aufwenden.
 
-Überprüfe die Umgebungsvariablen für Okapi:
+  Überprüfe die Umgebungsvariablen für Okapi:
 
-```
  curl -X GET http://localhost:9130/_/env
-```
 
-In der Folge, re-konfiguriere die Umgebungsvariablen so wie benötigt.
-Folge diesen Anweisungen um eine Umgebungsvariable für ein Modul zu ändern: [Change Environment Variables of a Module](https://wiki.folio.org/display/SYSOPS/Change+Environment+Variables+of+a+Module).
+  In der Folge, re-konfiguriere die Umgebungsvariablen so wie benötigt.
+  Folge diesen Anweisungen um eine Umgebungsvariable für ein Modul zu ändern: [Change Environment Variables of a Module](https://wiki.folio.org/display/SYSOPS/Change+Environment+Variables+of+a+Module).
 
 #### i. Setze neue globale Umgebungsvariablen
-Setze die Umgebungsvariable ENV -- das ist nur bei einem System mit mehreren Mandanten notwendig.
-Setze die Umgebungsvariable ENV auf ENV = ramsons . Wenn du nur einen einzigen Mandanten auf dem System betreibts, brauchst du dies nicht zu machen. Die Variable hat dann den Standardwert ENV = folio. Wir setzen es trotzdem.
-```
-curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"ENV\",\"value\":\"ramsons\"}" http://localhost:9130/_/env
-```
+  Setze die Umgebungsvariable ENV auf ENV = ramsons . Wenn du nur einen einzigen Mandanten auf dem System betreibts, brauchst du dies nicht zu machen. Die Variable hat dann den Standardwert ENV = folio. Wir setzen es trotzdem.
+
+  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"ENV\",\"value\":\"ramsons\"}" http://localhost:9130/_/env
 
 Setze INNREACH_TENANTS - ansosnten wir mod-inn-reach für deinen Mandanten nicht anstarten:
-```
-curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"INNREACH_TENANTS\",\"value\":\"wdr\"}" http://localhost:9130/_/env
-```
+
+curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"INNREACH_TENANTS\",\"value\":\"diku|bthvn\"}" http://localhost:9130/_/env
+
 Wenn du mehrere Mandanten hast, trenne ihre Namen durch ein "|" im Wert der INNREACH_TENANTS Variablen.
 
 KAFKA_HOST und KAFKA_PORT müssen in /env gesetzt sein, sonst kommt mod-users nicht hoch.
 
 Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links nicht hoch.
   
-#### ii. Inkompatible Hazelcast-Versionen in mod-remote-storage
-Während des Upgrades der Module werden die beiden Versionen "Bromelie" und "Bärlauch" von mod-remote-storage parallel laufen. Das funktioniert aber nur, wenn sie verschiedenen "Hazelcast"-Trauben zugeordnet sind. Setze den Namen der Hazelcast-Traube für die Bärlauch-Version auf "ramsons":
-```
+#### i. mod-oai-pmh
+  Das Modul soll mit der Java-Option -Dfile.encoding=UTF-8 hochgefahren werden.
+  cd ~/folio-install
+  # 1. Kopiere den Moduldeskriptor in eine Datei
+  curl -w '\n' -D -  http://localhost:9130/_/proxy/modules/mod-oai-pmh-3.14.4 > mod-oai-pmh-3.14.4-module-descriptor.json
+  # 2. Füge bei JAVA_OPTIONS hinzu: -Dfile.encoding=UTF-8 (ist schon)
+  # 3. Lösche den bisherigen Moduldeskriptor:
+  curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-oai-pmh-3.14.4
+  # 4. Sende den neuen Moduldeskriptor an /_/proxy/modules
+   curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-oai-pmh-3.14.4-module-descriptor.json http://localhost:9130/_/proxy/modules
+
+#### ii. Eureka-RTR-Support
+  für eine Reihe Module muss -- für Eureka -- folgendes gesetzt werden, damit RTR funktioniert:
+   JAVA_OPTIONS = -DSYSTEM_USER_ENABLED=false
+   und zwar für 
+     mod-data-import-3.2.4
+     mod-source-record-manager-3.9.10
+     mod-source-record-storage-5.9.12
+     mod-inventory-21.0.12
+     mod-invoice-5.9.2
+     mod-orders-12.9.11 .
+
+#### iii. mod-bulk-operations-2.1.12
+  für stabiles Funktionieren setzen:
+  JAVA_OPTIONS: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx2048m
+ 
+#### iv. Inkompatible Hazelcast-Versionen in mod-remote-storage-3.3.5
+  Während des Upgrades der Module werden die beiden Versionen "Bromelie" und "Bärlauch" von mod-remote-storage parallel laufen. Das funktioniert aber nur, wenn sie verschiedenen "Hazelcast"-Trauben zugeordnet sind. Setze den Namen der Hazelcast-Traube für die Bärlauch-Version auf "ramsons":
+
   # Konfiguriere mod-remote-storage-3.2.0 (Quesnelia-Version)
   cd ~/folio-install
   # 1. Kopiere den Moduldeskriptor in eine Datei
-  curl -w '\n' -D -  http://localhost:9130/_/proxy/modules/mod-remote-storage-3.2.0 > mod-remote-storage-3.2.0-module-descriptor.json
+  curl -w '\n' -D -  http://localhost:9130/_/proxy/modules/mod-remote-storage-3.3.5 > mod-remote-storage-3.3.5-module-descriptor.json
   # 2. Füge im Hochfahr-Deskriptor manuell eine Umgebungsvariable hinzu:
-      "name" : "HZ_CLUSTERNAME", "value" : "quesnelia"
+      "name" : "HZ_CLUSTERNAME", "value" : "ramsons"
   # 3. Lösche den bisherigen Moduldeskriptor:
-  curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-remote-storage-3.2.0
+  curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-remote-storage-3.3.5
   # 4. Sende den neuen Moduldeskriptor an /_/proxy/modules
-   curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-remote-storage-3.2.0-module-descriptor.json http://localhost:9130/_/proxy/modules
-```
+   curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-remote-storage-3.3.5-module-descriptor.json http://localhost:9130/_/proxy/modules
 
-#### iii. OAI-PMH (mod-oai-pmh) Konfiguration.
-Das muss man natürlich nur machen, wenn man die OAI-Schnittstelle auch tatsächlich benutzen will.
-Um staibl arbeiten zu könnnen benötigt mod-oai-pmh die folgende Speicherkonfiguration:
-  Editiere mod-oai-pmh-3.13.2-module-descriptor.json
-```
-JAVA_OPTIONS: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx2160m
-```
-Die Speichereinstellungen für edge-oai-pmh sind dieselben wie in vorhergehenden Versionen:
-  Editiere edge-oai-pmh-2.9.2-module-descriptor.json
-```
-JAVA_OPTIONS: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx1440m
-```
+#### v. OAI-PMH (mod-oai-pmh) Konfiguration.
+  Das muss man natürlich nur machen, wenn man die OAI-Schnittstelle auch tatsächlich benutzen will.
+  Um staibl arbeiten zu könnnen benötigt mod-oai-pmh die folgende Speicherkonfiguration:
+  Editiere mod-oai-pmh-3.14.4-module-descriptor.json
 
-#### iv. Setze jwt.signing.key für mod-authtoken
-Im Hochfahr-Deskriptor von mod-authtoken-2.15.2, setze jwt.signing.key in der JAVA_OPTION auf den gleichen Wert, wie du ihn in der vorhergehenden Version (Poppy, mod-authtoken-2.14.1) gesetzt hast:
-Setze Sekundendauer für verfallende Zeichen (Setze LEGACY_TOKEN_TENANTS="*", wenn du verfallende Zeichen nicht benutzen möchtest)
-```
+  JAVA_OPTIONS: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx2160m
+
+  Die Speichereinstellungen für edge-oai-pmh sind dieselben wie in vorhergehenden Versionen:
+  Editiere edge-oai-pmh-2.10.0-module-descriptor.json
+
+  JAVA_OPTIONS: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx1440m
+
+#### vi. Setze jwt.signing.key für mod-authtoken
+  Im Hochfahr-Deskriptor von mod-authtoken-2.16.2, setze jwt.signing.key in der JAVA_OPTION auf den gleichen Wert, wie du ihn in der vorhergehenden Version gesetzt hast:
+  Setze Sekundendauer für verfallende Zeichen (Setze LEGACY_TOKEN_TENANTS="*", wenn du verfallende Zeichen nicht benutzen möchtest)
+
     "env" : [ {
       "name" : "JAVA_OPTIONS",
-      "value" : "-XX:MaxRAMPercentage=66.0 -Dcache.permissions=true -Dallow.cross.tenant.requests=true -Djwt.signing.key=folio-hbz3-wdr"
+      "value" : "-XX:MaxRAMPercentage=66.0 -Dcache.permissions=true -Dallow.cross.tenant.requests=true -Djwt.signing.key=folio-hbz5-diku"
     }, {
       "name" : "LEGACY_TOKEN_TENANTS",
       "value" : ""
     }, {
       "name" : "TOKEN_EXPIRATION_SECONDS",
-      "value" : "tenantId:wdr,accessToken:3600,refreshToken:604800"
+      "value" : "tenantId:diku,accessToken:3600,refreshToken:604800;tenantId:bthvn,accessToken:3600,refreshToken:604800"
     }, {
-```
 
-#### v. Setze Umgebungsvariablen für mod-such (auch Bärlauch)
-Wenn du ENV = ramsons gesetzt hast, setze KAFKA_EVENTS_CONSUMER_PATTERN, indem du den Wert von ENV als Teil seines Wertes setzt:
+#### vii. Setze Umgebungsvariablen für mod-such (auch Bärlauch)
+  Wenn du ENV = ramsons gesetzt hast, setze KAFKA_EVENTS_CONSUMER_PATTERN, indem du den Wert von ENV als Teil seines Wertes setzt:
   curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"KAFKA_EVENTS_CONSUMER_PATTERN\",\"value\":\"(ramsons.)(.*.)inventory.(instance|holdings-record|item|bound-with)\"}" http://localhost:9130/_/env
     
-Hast du dagegen ENV = folio gesetzt, dann setze  KAFKA_EVENTS_CONSUMER_PATTERN = (folio.)(.*.)inventory.(instance|holdings-record|item|bound-with)
+  Hast du dagegen ENV = folio gesetzt, dann setze  KAFKA_EVENTS_CONSUMER_PATTERN = (folio.)(.*.)inventory.(instance|holdings-record|item|bound-with)
 
-in mod-search-3.2.7 ,
-Setze KAFKA_EVENTS_CONSUMER_PATTERN = (quesnelia\\.)(.*\\.)inventory\\.(instance|holdings-record|item|bound-with)
-Setze andere CONSUMER_PATTERNS im Moduldeskriptor ebenfalls, auf einen äquivalenten Wert.
-Setze SEARCH_BY_ALL_FIELDS_ENABLED auf "wahr" ("true"), wenn du die Suchoption "alle" aktivieren möchtest (suche in allen Feldern). Standardmäßig ist die Suche "in allen Feldern" ausgestellt.
+ zusätzlich in mod-search-4.0.11
+  Setze KAFKA_EVENTS_CONSUMER_PATTERN = (ramsons\\.)(.*\\.)inventory\\.(instance|holdings-record|item|bound-with)
+  Setze andere CONSUMER_PATTERNS im Moduldeskriptor ebenfalls, auf einen äquivalenten Wert.
+  Setze SEARCH_BY_ALL_FIELDS_ENABLED auf "wahr" ("true"), wenn du die Suchoption "alle" aktivieren möchtest (suche in allen Feldern). Standardmäßig ist die Suche "in allen Feldern" ausgestellt.
 
-#### vi. mod-agreements
-Vergrößere den Speicher im Hochfahrdeskriptor von mod-agreements-7.0.10 auf 8 GB, wenn du FOLIO mit einer GoKB verbinden möchtest.
-```
+#### viii. mod-agreements
+  Vergrößere den Speicher im Hochfahrdeskriptor von mod-agreements-7.1.5 auf 8 GB, wenn du FOLIO mit einer GoKB verbinden möchtest.
+
   "dockerArgs" : {
       "HostConfig" : {
         "Memory" : 8589934592,
-```
 
-#### vii. E-Mail-Konfiguration für Versand über hbz-SMTP-Server in mod-email anlegen
-  in den Moduldeskriptor von mod-email-1.17.0  einfügen (aus bisherigem Moduldeskriptor mod-email-1.16.0 kopieren):
+#### ix. E-Mail-Konfiguration für Versand über hbz-SMTP-Server in mod-email anlegen
+  in den Moduldeskriptor von mod-email-1.18.1  einfügen (aus bisherigem Moduldeskriptor mod-email-1.17.0 kopieren):
     }, {
       "name" : "FOLIO_HOST",
-      "value" : "http://folio-hbz4.hbz-nrw.de"
+      "value" : ""
     }, {
       "name" : "EMAIL_FROM",
-      "value" : "noreply@folio-hbz4.hbz-nrw.de"
+      "value" : ""
     }, {
       "name" : "EMAIL_USERNAME",
-      "value" : "hbz_admin"
+      "value" : ""
     }, {
       "name" : "EMAIL_PASSWORD",
-      "value" : "******" (kleines Tierchen, Anzahl Zehen und Finger)
+      "value" : ""
     }, {
       "name" : "EMAIL_SMTP_HOST",
       "value" : "mailhost.hbz-nrw.de"
     }, {
       "name" : "EMAIL_SMTP_PORT",
-      "value" : "25"
+      "value" : ""
     }, {
       "name" : "EMAIL_SMTP_LOGIN_OPTION",
       "value" : "DISABLED"
@@ -311,21 +304,22 @@ Vergrößere den Speicher im Hochfahrdeskriptor von mod-agreements-7.0.10 auf 8 
       "value" : "plain"
 
 
-#### viii. Einstellungen für die Lists-App
-   mod-lists-2.0.6
+#### x. Einstellungen für die Lists-App
+   mod-lists
    Setze die Umgebungsvariable:
-  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"LIST_APP_S3_BUCKET\",\"value\":\"wdr\"}" http://localhost:9130/_/env
+  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"LIST_APP_S3_BUCKET\",\"value\":\"hbz-test\"}" http://localhost:9130/_/env
 
-### II.v) Lasse Prä-Upgrade-Skripte laufen
-aus den Quesnelia Release Notes:
-  mod-users-bl-7.7.5
+#### xi. Token- und Passwort maximale Gültigkeitszeitdauer
+  mod-users-bl-7.9.3
   Vor oder nach dem Upgrade:
- Das Zeichen im "Passwort-Zurücksetzen"-Link läuft früh ab. Stelle sicher, dass mod-users-bl’s RESET_PASSWORD_LINK_EXPIRATION_TIME (Standard: 24 Stunden) nicht größer ist als mod-authtoken’s token.expiration.seconds (Standard: 10 minutes, aber von mir auf 1 Stunde hoch gesetzt)
+  Das Zeichen im "Passwort-Zurücksetzen"-Link läuft früh ab. Stelle sicher, dass mod-users-bl’s RESET_PASSWORD_LINK_EXPIRATION_TIME (Standard: 24 Stunden) nicht größer ist als mod-authtoken’s token.expiration.seconds (Standard: 10 Minuten, aber von mir auf 1 Stunde hoch gesetzt)
    - eine ENV-Variable im Moduldeskriptor hinzufügen:
        }, {
       "name" : "RESET_PASSWORD_LINK_EXPIRATION_TIME",
       "value" : "3600"
    
+### II.v) Lasse Prä-Upgrade-Skripte laufen
+ - für Bärlauch nichts zu tun.
 
 ## III. Erzeuge ein neues Schaufenster (oder auch Vorderende): Stripes
    Wir bauen zwei Stripes-Container für die beiden Mandanten (aber sie werden noch nicht aufgestellt):
@@ -335,7 +329,7 @@ aus den Quesnelia Release Notes:
    cd ~/platform-complete
    git diff
    vim stripes.config.js
-       - aboutInstallVersion anpassen => Quesnelia
+       - aboutInstallVersion anpassen => Bärlauch
        - aboutInstallDate auf aktuelles Datum ändern
    Benutze
      // use RTR instead of insecure legacy endpoints
@@ -345,18 +339,31 @@ aus den Quesnelia Release Notes:
    in der "config"-Sektion, um Refresh Token Rotation zu aktivieren.
    sudo su
    # Baue den Docker-Container, der Stripes und nginx enthalten wird:
-   docker build -f docker/Dockerfile --build-arg OKAPI_URL=https://wdr.folio.hbz-nrw.de/okapi --build-arg TENANT_ID=wdr -t stripes .
-Sending build context to Docker daemon  95.14MB
-Step 1/21 : FROM node:18-alpine as stripes_build
-18-alpine: Pulling from library/node
-f18232174bc9: Pull complete
-...
-Step 21/21 : ENTRYPOINT ["/usr/bin/entrypoint.sh"]
- ---> Running in 397b822832f0
-Removing intermediate container 397b822832f0
- ---> 084ae9661539
-Successfully built 084ae9661539
-Successfully tagged stripes:latest
+   docker build -f docker/Dockerfile --build-arg OKAPI_URL=https://hbz-test.folio.hbz-nrw.de/okapi --build-arg TENANT_ID=diku -t stripes .
+[+] Building 187.4s (22/22) FINISHED                                                             docker:default
+ => WARN: FromAsCasing: 'as' and 'FROM' keywords' casing do not match (line 1)
+  Das läuft ca. 5 Minuten.
+
+  Mache das gleiche für den 2. Mandanten:
+   cd ~/platform-complete-bthvn
+   git status
+   git fetch origin
+   git stash save
+   git checkout R2-2024-csp-1
+   git stash pop
+
+   Wir benutzen das Dockerfile in platform-complete/docker.
+   Überprüfen Sie platform-complete/docker: vim Dockerfile nginx.conf .
+   Wenn letzesmal erfolgreich installiert wurde, sollte jetzt nichts zu ändern sein. Einfach "git diff" machen.
+   git diff
+   vim stripes.config.js
+       - aboutInstallVersion anpassen => Bärlauch
+       - aboutInstallDate auf aktuelles Datum ändern
+   sudo su
+   # Baue den Docker-Container, der Stripes und nginx enthalten wird:
+   docker build -f docker/Dockerfile --build-arg OKAPI_URL=https://bthvn-test.folio.hbz-nrw.de/okapi --build-arg TENANT_ID=bthvn -t stripes_bthvn .
+[+] Building 186.5s (22/22) FINISHED                                                             docker:default
+ => WARN: FromAsCasing: 'as' and 'FROM' keywords' casing do not match (line 1)
   Das läuft ca. 5 Minuten.
 
 
@@ -364,34 +371,35 @@ Successfully tagged stripes:latest
 
 Benutzer sollten jetzt nicht mehr mit dem System arbeiten, denn nachdem ein neues Backend aufgestellt wurde, wird das Frontend nicht mehr damit kompatibel sein und muss ebenfalls neu aufgestellt werden.
   Das System (erneut, nach dem Postgres-Upgrade) vom Netz nehmen.
-  # bis hierher für wdr-test 2,5 Std gebraucht (23.01.2025, 16:30 - 19:00)
-  # bis hierher für wdr 4,5 Std gebraucht (20.03.2025, 15:30 - 20:30, mit 1/2 Std. Pause)
 
-Jetzt lasse einen Schnappschuss deines Systems machen, der ggfs. zurück gespielt werden kann, falls das folgende Vorgehen fehlschlägt.
+  Jetzt lasse einen Schnappschuss deines Systems machen, der ggfs. zurück gespielt werden kann, falls das folgende Vorgehen fehlschlägt.
 
-  # weiter 24.01.2025 12:50 Uhr
-  # weiter 21.03.2025 09:30 Uhr
   Gucken, ob alle Dienste nach dem Schnappschuss wieder angestartet sind.
-  Besser Kafka runter fahren ; mod-dcb ist mit Kafka bei der Aktivierung abgestürzt.
-  sudo su; cd /opt/kafka-zk ; docker-compose down
-    ==> mod-data-export-worker loggt wie blöde; "Kafka nicht verfügbar"
+  # Besser Kafka runter fahren ; mod-dcb ist mit Kafka bei der Aktivierung abgestürzt.
+  # sudo su; cd /opt/kafka-zk ; docker-compose down
+  #  ==> mod-data-export-worker loggt wie blöde; "Kafka nicht verfügbar"
 
   mod-dcb nicht installieren !
-  Jetzt die 3 Module aus der install.json heraus nehmen (Einträge löschen).
-  # ansonsten nachträglich am 10.02.2025 gemacht:
+  Diese 3 Module aus der install.json heraus nehmen (Einträge löschen).
+      "mod-dcb-1.1.6", "mod-circulation-item-1.0.0", "edge-dcb-1.1.3"
+  Das auch für bthvn-Mandanten gemacht.
+
+  # Falls vergessen, die Module nachträglich deaktivieren:
   # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-dcb-1.1.6\",\"action\":\"disable\"},{\"id\":\"mod-circulation-item-1.0.0\",\"action\":\"disable\"},{\"id\":\"edge-dcb-1.1.3\",\"action\":\"disable\"}]" http://localhost:9130/_/proxy/tenants/wdr/install?simulate=true\&preRelease=false
   # dann
   # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-dcb-1.1.6\",\"action\":\"disable\"},{\"id\":\"mod-circulation-item-1.0.0\",\"action\":\"disable\"},{\"id\":\"edge-dcb-1.1.3\",\"action\":\"disable\"}]" http://localhost:9130/_/proxy/tenants/wdr/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dfalse
 
-  Stelle alle Werkstattmodule der neuen Version mit einer einzigen Senden-Anfrage an Okapis Installations-Endpunkt bereit:
+  Stelle alle Werkstattmodule der neuen Version mit einer einzigen Anfrage an Okapis Installations-Endpunkt bereit:
   Das wird alle neuen Module aufstellen und aktivieren. Beginne mit einem Simualtionslauf:
-```
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/wdr/install?simulate=true\&preRelease=false
-```
+
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?simulate=true\&preRelease=false
+   hier weiter
+  Some modules cannot be topological sorted: mod-ldp-1.1.3
+
   Dann wiederhole die gleiche Anfrage mit "deploy=true": 
-```
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/wdr/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dfalse
-```
+
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dfalse
+
   Diese Anfrage wird fehlschlagen, weil Schaufenstermodule nicht von Docker aufgestellt werden können. - Wir machen diese Anfrage trotzdem.
   Sie werden folgende Nachricht vom System erhalten: "HTTP/1.1 400 Bad Request Module folio_developer-8.0.1 has no launchDescriptor".
   Aber diese Anfrage wird alle Werkstattmodule aufstellen. Sie wird allerdings noch keine Module aktivieren.
@@ -679,6 +687,7 @@ transfer-encoding: chunked
   15:36:13 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4 14:36:13 [] [] [] [] INFO  KafkaConsumerWrapper businessHandlerCompletionHandler:: Consumer - id: 0 subscriptionPattern: SubscriptionDefinition(eventType=instance, subscriptionPattern=quesnelia.\w{1,}.inventory.instance) Committed offset: 42
   ...
   das geht bis Committed offset: 224829, alles innerhalb von 60 Sekunden.
+  224.826 Titeldatensätze am 14.4.2025 auf hbz-test.
 
   In der Datenbank:
   select count(*) from wdr_mod_inventory_storage.instance;
