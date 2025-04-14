@@ -1,5 +1,5 @@
 ---
-Titel: "Einzelserver: Upgrade"
+Titel: "Einzelserver: Aktualisierung"
 ---
 
 ![FOLIO Single Server Komponenten](/img/single_docker_compose.png)
@@ -50,9 +50,28 @@ Mach das hier vor dem Upgrade:
 Konfiguriere die Umgebungsvariable PLATFORM. Mögliche Werte sind okapi oder eureka. Der Standardwert ist okapi.
   curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"PLATFORM\",\"value\":\"okapi\"}" http://localhost:9130/_/env
 
-#### 1.) mod-data-export-worker
+#### 2.) mod-data-export-worker
+	 Für S3-Speicher kompatible Umgebungsvariablen.
+  Einige Module benutzen S3-kompatiblen persistenten Speicher (AWS-S3 oder Minion-Server).
+  mod-data-export-worker benutzt es schon seit längerer Zeit.
+  Andere Module, die S3-(kompatiblen)-Speicher benutzen, sind:
+    mod-bulk-operations,
+    mod-data-import - für große MARC-21-Importdateien
+    mod-oai-pmh - Für Fehlerprotokolldateien
+    mod-lists - Um Inhalte von Listen exportieren zu können
+    mod-entities-links
+    mod-data-export
+
+  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_IDS_BATCH\",\"value\":\"1000\"}" http://localhost:9130/_/env
+  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_FILES_MAX_POOLSIZE\",\"value\":\"10\"}" http://localhost:9130/_/env
+
 Umgebungsvariablen mit AWS_* wurden umbenannt nach S3_* :  S3_URL , S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY,  S3_IS_AWS .
-Neue Umgebungsvariablen wurden eingefürht: S3_SUB_PATH, S3_LOCAL_SUB_PATH . Das ist ein Unterpfad für die Dateispeicherung in S3. Für hbz-test habe ich in minio einen neuen Unterpfad "subpath" angelegt.
+Neue Umgebungsvariablen wurden eingeführt: S3_SUB_PATH, S3_LOCAL_SUB_PATH . Das ist ein Unterpfad für die Dateispeicherung in S3. Für hbz-test habe ich in minio einen neuen Unterpfad "subpath" angelegt.
+
+  Teste Browser-Zugriff auf den minio-Server:
+    http://folio-minio.hbz-nrw.de:9090/
+    Login: folioadmin, Passw: folIko23
+    #Login: minioadmin, Passw: minioadmin
 
 #### 2.) mod-oai-pmh
 Das Modul soll mit der Java-Option -Dfile.encoding=UTF-8 hochgefahren werden.
@@ -67,7 +86,7 @@ für stabiles Funktionieren setzen:
   JAVA ARGS: XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx2048m,
  
 
-## II. Upgrade Okapi und Vorebereitung des Werkstattmodul-Upgrades
+## II. Upgrade Okapi und Vorbereitung des Werkstattmodul-Upgrades
 ### II.i) Hole eine neue Version von "platform-complete"
  Hole die neue Version von "platform-complete", wechsele in das Verzeichnis:
 ```
@@ -164,39 +183,27 @@ Auf diesem Teil wird ein Systemadministrator vermutlich die meiste Zeit aufwende
 ```
 
 In der Folge, re-konfiguriere die Umgebungsvariablen so wie benötigt.
-Study the release notes for any changes in module configurations.
-Follow these instructions to change the environment variables for a module: [Change Environment Variables of a Module](https://wiki.folio.org/display/SYSOPS/Change+Environment+Variables+of+a+Module).
+Folge diesen Anweisungen um eine Umgebungsvariable für ein Modul zu ändern: [Change Environment Variables of a Module](https://wiki.folio.org/display/SYSOPS/Change+Environment+Variables+of+a+Module).
 
-Make sure SYSTEM_USER_PASSWORD in /\_/env is the actual password for these system users:
-  - system-user
-  - pub-sub
-  - mod-search
-  - data-export-system-user
-  - mod-entities-links
-  - mod-innreach   (if you are utilizing this module)
-
-Log in as these users with this password. If that doesn't work, change the password of these system users to the value of the system variable SYSTEM_USER_PASSWORD.
-  => das ist in Zukunft nicht mehr nötig. Es ist der Fall und für neue User ist es automatisch der Fall, z.B. dcb-system-user, neu in Quesnelia.
-
-#### i. Set new global environment variables
+#### i. Setze neue globale Umgebungsvariablen
 Setze die Umgebungsvariable ENV -- das ist nur bei einem System mit mehreren Mandanten notwendig.
-Setze die Umgebungsvariable ENV auf ENV = quesnelia . Wenn du nur einen einzigen Mandanten auf dem System betreibts, brauchst du dies nicht zu machen. Die Variable hat dann den Standardwert ENV = folio. => trotzdem setzen
+Setze die Umgebungsvariable ENV auf ENV = ramsons . Wenn du nur einen einzigen Mandanten auf dem System betreibts, brauchst du dies nicht zu machen. Die Variable hat dann den Standardwert ENV = folio. Wir setzen es trotzdem.
 ```
-curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"ENV\",\"value\":\"quesnelia\"}" http://localhost:9130/_/env
+curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"ENV\",\"value\":\"ramsons\"}" http://localhost:9130/_/env
 ```
 
 Setze INNREACH_TENANTS - ansosnten wir mod-inn-reach für deinen Mandanten nicht anstarten:
 ```
 curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"INNREACH_TENANTS\",\"value\":\"wdr\"}" http://localhost:9130/_/env
 ```
-If you have multiple tenant, separate their names by "|" in the INNREACH_TENANTS variable's value.
+Wenn du mehrere Mandanten hast, trenne ihre Namen durch ein "|" im Wert der INNREACH_TENANTS Variablen.
 
-Make sure KAFKA_HOST and KAFKA_PORT are set in /env, otherwise mod-user will fail startup.
+KAFKA_HOST und KAFKA_PORT müssen in /env gesetzt sein, sonst kommt mod-users nicht hoch.
 
-Set DB_CONNECTION_TIMEOUT to at least 250, otherwise mod-entities-links will fail startup.
+Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links nicht hoch.
   
 #### ii. Inkompatible Hazelcast-Versionen in mod-remote-storage
-Während des Upgrades der Module werden die beiden Versionen "Mohnblume" und "Bromelie" von mod-remote-storage parallel laufen. Das funktioniert aber nur, wenn sie verschiedenen "Hazelcast"-Trauben zugeordnet sind. Setze den Namen der Hazelcast-Traube für die Bromelien-Version auf "quesnelia":
+Während des Upgrades der Module werden die beiden Versionen "Bromelie" und "Bärlauch" von mod-remote-storage parallel laufen. Das funktioniert aber nur, wenn sie verschiedenen "Hazelcast"-Trauben zugeordnet sind. Setze den Namen der Hazelcast-Traube für die Bärlauch-Version auf "ramsons":
 ```
   # Konfiguriere mod-remote-storage-3.2.0 (Quesnelia-Version)
   cd ~/folio-install
@@ -223,29 +230,7 @@ Die Speichereinstellungen für edge-oai-pmh sind dieselben wie in vorhergehenden
 JAVA_OPTIONS: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx1440m
 ```
 
-#### iv. Für S3-Speicher kompatible Umgebungsvariablen.
-Einige Module benutzen S3-kompatiblen persistenten Speicher (AWS-S3 oder Minion-Server).
-mod-data-export-worker benutzt es schon seit längerer Zeit.
-Andere Module, die S3-(kompatiblen)-Speicher benutzen, sind:
-  mod-bulk-operations,
-  mod-data-import - if you want to use the splitting functionality for large MARC21 import files,
-  mod-oai-pmh - if you want to store error logs,
-  mod-lists - in order to support exporting list contents.
-  mod-entities-links
-  mod-data-export
-  Setze zumindest dies Umgebungsvariablen. Du kannst sie in Okapis globalen Umgebungsvariablen setzen:
-       S3_URL, S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY.
-  Entferne alle AWS_* vars (optional), denn sie wurden durch S3_*. 
-
-  Teste Browser-Zugriff auf den minio-Server:
-    http://folio-minio.hbz-nrw.de:9090/
-    Login: folioadmin, Passw: folIko23
-    #Login: minioadmin, Passw: minioadmin
-
-  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_IDS_BATCH\",\"value\":\"1000\"}" http://localhost:9130/_/env
-  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_FILES_MAX_POOLSIZE\",\"value\":\"10\"}" http://localhost:9130/_/env
-
-#### v. Setze jwt.signing.key für mod-authtoken
+#### iv. Setze jwt.signing.key für mod-authtoken
 Im Hochfahr-Deskriptor von mod-authtoken-2.15.2, setze jwt.signing.key in der JAVA_OPTION auf den gleichen Wert, wie du ihn in der vorhergehenden Version (Poppy, mod-authtoken-2.14.1) gesetzt hast:
 Setze Sekundendauer für verfallende Zeichen (Setze LEGACY_TOKEN_TENANTS="*", wenn du verfallende Zeichen nicht benutzen möchtest)
 ```
@@ -261,7 +246,7 @@ Setze Sekundendauer für verfallende Zeichen (Setze LEGACY_TOKEN_TENANTS="*", we
     }, {
 ```
 
-#### vi. Setze Umgebungsvariablen für mod-search (auch Bärlauch)
+#### v. Setze Umgebungsvariablen für mod-such (auch Bärlauch)
 Wenn du ENV = ramsons gesetzt hast, setze KAFKA_EVENTS_CONSUMER_PATTERN, indem du den Wert von ENV als Teil seines Wertes setzt:
   curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"KAFKA_EVENTS_CONSUMER_PATTERN\",\"value\":\"(ramsons.)(.*.)inventory.(instance|holdings-record|item|bound-with)\"}" http://localhost:9130/_/env
     
@@ -272,7 +257,7 @@ Setze KAFKA_EVENTS_CONSUMER_PATTERN = (quesnelia\\.)(.*\\.)inventory\\.(instance
 Setze andere CONSUMER_PATTERNS im Moduldeskriptor ebenfalls, auf einen äquivalenten Wert.
 Setze SEARCH_BY_ALL_FIELDS_ENABLED auf "wahr" ("true"), wenn du die Suchoption "alle" aktivieren möchtest (suche in allen Feldern). Standardmäßig ist die Suche "in allen Feldern" ausgestellt.
 
-#### vii. mod-agreements
+#### vi. mod-agreements
 Vergrößere den Speicher im Hochfahrdeskriptor von mod-agreements-7.0.10 auf 8 GB, wenn du FOLIO mit einer GoKB verbinden möchtest.
 ```
   "dockerArgs" : {
@@ -280,7 +265,7 @@ Vergrößere den Speicher im Hochfahrdeskriptor von mod-agreements-7.0.10 auf 8 
         "Memory" : 8589934592,
 ```
 
-#### viii. E-Mail-Konfiguration für Versand über hbz-SMTP-Server in mod-email anlegen
+#### vii. E-Mail-Konfiguration für Versand über hbz-SMTP-Server in mod-email anlegen
   in den Moduldeskriptor von mod-email-1.17.0  einfügen (aus bisherigem Moduldeskriptor mod-email-1.16.0 kopieren):
     }, {
       "name" : "FOLIO_HOST",
@@ -293,7 +278,7 @@ Vergrößere den Speicher im Hochfahrdeskriptor von mod-agreements-7.0.10 auf 8 
       "value" : "hbz_admin"
     }, {
       "name" : "EMAIL_PASSWORD",
-      "value" : "Maus20"
+      "value" : "******" (kleines Tierchen, Anzahl Zehen und Finger)
     }, {
       "name" : "EMAIL_SMTP_HOST",
       "value" : "mailhost.hbz-nrw.de"
@@ -326,7 +311,7 @@ Vergrößere den Speicher im Hochfahrdeskriptor von mod-agreements-7.0.10 auf 8 
       "value" : "plain"
 
 
-#### ix. Einstellungen für die Lists-App
+#### viii. Einstellungen für die Lists-App
    mod-lists-2.0.6
    Setze die Umgebungsvariable:
   curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"LIST_APP_S3_BUCKET\",\"value\":\"wdr\"}" http://localhost:9130/_/env
@@ -335,7 +320,7 @@ Vergrößere den Speicher im Hochfahrdeskriptor von mod-agreements-7.0.10 auf 8 
 aus den Quesnelia Release Notes:
   mod-users-bl-7.7.5
   Vor oder nach dem Upgrade:
- Das Zeichen im "Passwort-Zurücksetzen"-Link läuft früh ab. Stelle sicher, dass mod-users-bl’s RESET_PASSWORD_LINK_EXPIRATION_TIME (default: 24 hours) does not exceed mod-authtoken’s token.expiration.seconds (default: 10 minutes, aber von mir auf 1 Stunde hoch gesetzt)
+ Das Zeichen im "Passwort-Zurücksetzen"-Link läuft früh ab. Stelle sicher, dass mod-users-bl’s RESET_PASSWORD_LINK_EXPIRATION_TIME (Standard: 24 Stunden) nicht größer ist als mod-authtoken’s token.expiration.seconds (Standard: 10 minutes, aber von mir auf 1 Stunde hoch gesetzt)
    - eine ENV-Variable im Moduldeskriptor hinzufügen:
        }, {
       "name" : "RESET_PASSWORD_LINK_EXPIRATION_TIME",
@@ -637,74 +622,12 @@ content-length: 62
   Die Abbildungsregeln für MARC-Instanzen wurden aktualisiert/erweitert.
   Folge diesen Anweisungen: https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/135856129
 
-*** alt, von Bromelie ***
-#### 1.) Update MARC-Instance Abbildungen (Optional)
-Nach dem Upgrade, folge den Anweisungen um die Abbildungsregeln zu aktualisieren. Diese Änderungen sind optional.
-# https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1407190/Script+to+update+mapping+rules+with+required+condition+for+specified+fields
-  Mache:
-  cd ~/upgrade
-  java -jar folio-mapping-rules-update-quesnelia.jar folio-mapping-rules-update-quesnelia.configuration.wdr.json
-  .   ____          _            __ _ _
- /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
-( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
- \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
-  '  |____| .__|_| |_|_| |_\__, | / / / /
- =========|_|==============|___/=/_/_/_/
- :: Spring Boot ::               (v2.7.15)
-
-2025-03-21 11:11:16.393  INFO 173496 --- [           main] org.folio.FolioMappingRulesUpdateApp     : Starting FolioMappingRulesUpdateApp v0.0.1-SNAPSHOT using Java 17.0.2 on folio-hbz3 with PID 173496 (/usr/folio/upgrade/folio-mapping-rules-update-quesnelia.jar started by folio in /usr/folio/upgrade)
-2025-03-21 11:11:16.396  INFO 173496 --- [           main] org.folio.FolioMappingRulesUpdateApp     : No active profile set, falling back to 1 default profile: "default"
-2025-03-21 11:11:17.056  INFO 173496 --- [           main] org.folio.FolioMappingRulesUpdateApp     : Started FolioMappingRulesUpdateApp in 1.304 seconds (JVM running for 3.183)
-2025-03-21 11:11:17.836  INFO 173496 --- [           main] org.folio.client.SRMClient               : Retrieving mapping rules...
-2025-03-21 11:11:18.114  INFO 173496 --- [           main] org.folio.util.MappingRulesUtil          : Mapping rules for MARC field "100" have been updated
-2025-03-21 11:11:18.116  INFO 173496 --- [           main] org.folio.util.MappingRulesUtil          : Mapping rules for MARC field "110" have been updated
-2025-03-21 11:11:18.116  INFO 173496 --- [           main] org.folio.util.MappingRulesUtil          : Mapping rules for MARC field "111" have been updated
-2025-03-21 11:11:18.116  INFO 173496 --- [           main] org.folio.client.SRMClient               : Sending request to update mapping rules...
-2025-03-21 11:11:18.306  INFO 173496 --- [           main] o.f.service.UpdateMappingRulesService    : Mapping rules for "classification" field have been successfully updated on the target environment for the following MARC fields: [100, 110, 111]
-2025-03-21 11:11:18.306  INFO 173496 --- [           main] org.folio.FolioMappingRulesUpdateApp     : Script execution completed
-
-#### 2.) Data Import Arbeitsprofile
-Lasse dieses Skript laufen, um Arbeitsprofile zu identifizieren, die inspiziert und ggfs. korrigiert werden müssen:
-# https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/168788217
-  Identifiziere "ungültige Assoziationen" :
-  ssh folio@folio-hbz4-dbserver
-  su - postgres
-  cd /usr/folio/upgrade/quesnelia
-  ./data-import-job-profiles.sh wdr
- jobprofileid 
---------------
-(0 rows)
-  - nichts zu tun.
-
-#### 3.) mod-data-export-spring
-Diese manuelle Aufage muss man nur machen, wenn noch mindestens ein weiterer Mandant auf der "Mohnblume" bleiben soll. Wenn alle Mandanten gleichzeitig nach "Bromelie" migriert werden, ist diese manuellet Aufgabe nicht notwendig. => nicht gemacht.
-Nach der Migration, lasse dieses laufen:
-  su - postgres
-  psql folio
-  UPDATE mod_data_export_spring_quartz.databasechangelog SET md5sum = '9:89aea1286f2c2901835da380fa17eff7' WHERE id = 'quartz-init';
-UPDATE 1
-
 ### VII.ii) Neuaufbau des "Elasticsearch"-Indexes
 
   Bärlauch: Nach dem Upgrade muss eine neue API benutzt werden, um die Titeldatensätze zu indexieren.
   Der alte Endpoint /search/index/inventory/reindex funktioniert nicht mehr.
 
   Wir machen einen "vollen Reindex":
-    POST /search/index/instance-records/reindex/full
-   evtl. muss man dem vollen Reindex auch diese Parameter übergeben:
-   x-okapi-tenant: [tenant]
-   x-okapi-token: [JWT_TOKEN]
-{
-  "entityTypes": ["instance", "subject", "contributor", "classification"]
-}
-  Um den asynchronen Prozess zu überwachen können wir diesen Endpunkt ausführen:
-    GET /search/index/instance-records/reindex/status
-
-  Die genaue Spezifikation der API findet sich hier: https://github.com/folio-org/mod-search/tree/v4.0.0?tab=readme-ov-file#indexing-of-instance-records
-
-  /*** alt, Bromelie ***/
-  Die folgende Berechtigung muss dem Nutzer folio_admin zugewiesen worden sein:
-    search.index.inventory.reindex.post (Search - starts inventory reindex operation)
 
   Die Indexierung anstoßen
   ========================
@@ -714,19 +637,20 @@ UPDATE 1
      curl -s -S -D - -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" -H "Accept: application/json" -d '{ "tenant" : "wdr", "username" : "folio_admin", "password" : "********" }' http://localhost:9130/authn/login-with-expiry
   Das TOKEN ist der Teil zwischen "Set-Cookie: folioAccessToken=" und dem ersten Semikolon;
       export TOKEN=...
-      curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" -d '{ "recreateIndex": true, "resourceName": "instance" }' http://localhost:9130/search/index/inventory/reindex
-HTTP/1.1 200 OK
-Content-Type: application/json
-Date: Fri, 21 Mar 2025 11:15:29 GMT
-transfer-encoding: chunked
 
-{"id":"8b76ab8e-8250-43ae-b386-c368b1dc3639","jobStatus":"In progress","submittedDate":"2025-03-21T11:15:29.523+00:00"}
+      Ab "Bärlauch" ("R"-Auskopplung) geht es so:
+       curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" -d '{"entityTypes": ["instance", "subject", "contributor", "classification"]}' http://localhost:9130/search/index/instance-records/reindex/full
+      auch erst ab Ransoms: Wenn das einmal gemacht wurde ("1. Schritt: Datenaggregation/Merge", "2. Schritt: Upload") muss danach nur noch der 2. Schritt aufgerufen werden, das geschieht mit dem Endpoint /upload. Siehe hier: https://github.com/folio-org/mod-search?tab=readme-ov-file#indexing-of-instance-records
+{
+  "entityTypes": ["instance", "subject", "contributor", "classification"]
+}
+  Um den asynchronen Prozess zu überwachen können wir diesen Endpunkt ausführen:
+    GET /search/index/instance-records/reindex/status
 
-      ### erst ab "Bärlauch" ("R"-Auskopplung) geht es dann so:
-      ###  curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" -d '{"entityTypes": ["instance", "subject", "contributor", "classification"]}' http://localhost:9130/search/index/instance-records/reindex/full
-      ### auch erst ab Ransoms: Wenn das einmal gemacht wurde ("1. Schritt: Datenaggregation/Merge", "2. Schritt: Upload") muss danach nur noch der 2. Schritt aufgerufen werden, das geschieht mit dem Endpoint /upload. Siehe hier: https://github.com/folio-org/mod-search?tab=readme-ov-file#indexing-of-instance-records
+  Die genaue Spezifikation der API findet sich hier: https://github.com/folio-org/mod-search/tree/v4.0.0?tab=readme-ov-file#indexing-of-instance-records
 
- ### Beobachte den Reindxierungsprozess ( https://github.com/folio-org/mod-search#monitoring-reindex-process )
+  (alt, Bromelie:) Die folgende Berechtigung muss dem Nutzer folio_admin zugewiesen worden sein:
+    search.index.inventory.reindex.post (Search - starts inventory reindex operation)
 
   Es gibt keine "Ende-zu-Ende"-Überwachung, aber es ist möglich, den Vorgang teilweise zu überwachen.
   Benutze die Katalog-API, um zu überprüfen, wie vile Datensätze an das Kafka-Thema veröffentlicht worden sind:
