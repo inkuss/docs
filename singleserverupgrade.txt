@@ -319,6 +319,7 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
        }, {
       "name" : "RESET_PASSWORD_LINK_EXPIRATION_TIME",
       "value" : "3600"
+    - in JAVA_OPTIONS hinzu fügen: -Xmx2048m
    
 ### II.v) Lasse Prä-Upgrade-Skripte laufen
  - für Bärlauch nichts zu tun.
@@ -450,64 +451,50 @@ No running instances for module mod-search-4.0.11. Can not invoke /_/tenant
 
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
 
-   hier weiter
-
   Wenn das fehlschlägt, finde den Grund dafür heraus, behebe die Fehlerursache und versuche es erneut, bis die Anfrage erfolgreich war.
 
   (Quesnelia: Das dauerte 90 Sekunden pro Mandant.)
 
   Wiederhole diesen Schritt für eventuelle weitere Mandanten (solche, die ebenfalls platform-complete installiert haben) auf deinem System.
+  - für bthvn dauert da 5 Minuten.
 
   Alte Module, die noch laufen, aber nun nicht mehr benötigt werden, werden wir im "Aufräum"-Kapitel entfernen.
  
-       68 Bromelien-Werkstattmodule wurden während "deploy=true" für wdr hochgefahren (66 ohne mod-dcb und mod-circluation-item).
-       Es sind aber 71 Werkstattmodule in Quesnelia. 3 Module sind in Poppy und Quesnelia gleich.
-       67 Backend-Module liefen schon vorher (Poppy).
-   Es sollte nun 135 Module auf deinem Server geben. Versuche
+       73 Bärlauch-Werkstattmodule wurden während "deploy=true" hochgefahren (70 ohne mod-dcb, mod-circluation-item und mod-reporting).
+       71 Werkstattmodule liefen schon vorher (Bromelie).
+   Es sollte nun 144 (141) Module auf deinem Server geben. Versuche
 
   docker ps | grep "mod-" | wc
-    135 (133) sollen es sein.
-
-       Auf folio-hbz4 läuft außerdem noch:
-       3d274f3c628f   folioorg/mod-licenses:5.0.3  (ist das keine Poppy-Version ?)
-
-  64 dieser Module gehören zur Mohnblumen-Version, 68 gehören ausschließlich zur Bromelien-Version, und drei Modulversionen gehören zu beiden FOLIO-Versionen.
-  * nicht neu in Quesnelia (Quesnelia = Poppy Version):
-    mod-z3950:3.3.5
-    mod-graphql:1.12.1
-    mod-kb-ebsco-java-4.0.0
-
-  * nur Quesnelia (neu in Quesnelia):
-    mod-serials-management:1.0.3
-    mod-dcb:1.1.5
-    mod-circulation-item:1.0.0
-    mod-batch-print:1.2.0
+    144 (141) sollen es sein.
 
   Jetzt sind die Module der Bärlauch-Version für deinen Mandanten aktiviert:
-```
+
   curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules | grep id | wc
-  152 (145 ohne mod-dcb, mod-circulation-item und edge-dcb)
-```
+  147 (152 mit mod-dcb, mod-circulation-item, edge-dcb, mod-reporting und folio_ldp)
+  curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules | grep id | wc
+  150
+
 
   Diese Zahl ist die Summe folgender Anzahlen:
 
- Bromelie CSP-9 Veröffentlichung (siehe ~/folio-install/modules.quesnelia.csv):
- - 64 Schaufenstermodule
- - 12 Kantenmodule
- - 71 Werkstattmodule
- -  1 Okapi-Modul (Portal) (5.3.0) 
+ Bärlauch CSP-1 Veröffentlichung (siehe ~/folio-install/modules.quesnelia.csv):
+         65 Schaufenstermodule
+       + 13 Kantenmodule
+       + 73 Werkstattmodule
+       +  1 Okapi-Modul (Portal) (6.1.3) 
+ Summe: 152
 
-  Das sind alle Module der Veröffentlichung R1-2024 "Bromelie".
+  Das sind alle Module der Veröffentlichung R2-2024 "Bärlauch".
 
 ## V. Bringe das neue Vorderende (Schaufenster) an den Start
   Halte den alten Stripes-Container an:
-```
+
   docker stop stripes
   docker rm stripes
-```
+
   Starte den neuen Stripes-Container.
   Leite Hafen 80 von innerhalb des Hafenarbeiter-Behältnisses nach Hafen 80 auch außerhalb weiter.
-```
+
   cd /usr/folio/platform-complete
   sudo su
   ## systemctl start stripes (das geht nicht)
@@ -516,17 +503,47 @@ No running instances for module mod-search-4.0.11. Can not invoke /_/tenant
   # Wenn der Status des Dienstes nicht O.K. ist, den Stripes-Behälter einmal anhalten und dann über den Dienst neu starten (das geht):
      - docker stop stripes
      - systemctl start stripes
-```
+
 
   Wiederhole diese Schritte für die Stripes-Behältnisse eventueller anderer Mandanten.
+    cd ../platform-complete-bthvn/
+    docker stop stripes_bthvn
+    docker rm stripes_bthvn
+    nohup docker run -d -p 90:80 --name stripes_bthvn stripes_bthvn &
+    systemctl status stripes_btvhn
 
   Das System wieder ans Netz bringen (auf folio-proxy).
   Browser-Cache löschen.
-  Im Browser am System anmelden: Einloggen auf https://wdr.folio.hbz-nrw.de, folio_admin
+  Im Browser am System anmelden: Einloggen auf https://hbz-test.folio.hbz-nrw.de, diku_admin
 
-  - Sehen Sie die Bromelien-Module in Einstellungen - Installationsdetails ?
+   mod-user-bl ist beim Anmelden herunter gekommen:
+  6:29:47 [646834/bl-users] [diku] [] [mod_users_bl] INFO  RestRouting          invoking postBlUsersLoginWithExpiry
+Terminating due to java.lang.OutOfMemoryError: Java heap space
+  # mod-users-bl deaktivieren und Java Heap Space erhöhen:
+  # erst ein Testlauf
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"folio_users-11.0.11\",\"action\":\"disable\"},{\"id\":\"folio_stripes-core-10.2.5\",\"action\":\"disable\"},{\"id\":\"mod-users-bl-7.9.3\",\"action\":\"disable\"}]" http://localhost:9130/_/proxy/tenants/diku/install?simulate=true\&preRelease=false
+  # dann das Modul und abhängige deaktivieren
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"folio_users-11.0.11\",\"action\":\"disable\"},{\"id\":\"folio_stripes-core-10.2.5\",\"action\":\"disable\"},{\"id\":\"mod-users-bl-7.9.3\",\"action\":\"disable\"}]" http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dfalse
+   Auch für Beethoven deaktivieren.
+      nun noch das Modul aus dem Discovery entfernen (auch, wenn es schon abgestürzt ist):
+      curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-users-bl-7.9.3
+  # Moduldeskriptor ändern:
+    vim mod-users-bl-7.9.3-module-descriptor.json
+    füge hinzu:  -Xmx2048m
+    curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-users-bl-7.9.3
+    curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-users-bl-7.9.3-module-descriptor.json http://localhost:9130/_/proxy/modules
+  # Neu hochfahren mod-users-bl
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-users-bl-7.9.3\",\"action\":\"enable\"}]" http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dtrue
+  # Modul & abhängige wieder aktivieren:
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-users-bl-7.9.3\",\"action\":\"enable\"},{\"id\":\"folio_users-11.0.11\",\"action\":\"enable\"},{\"id\":\"folio_stripes-core-10.2.5\",\"action\":\"enable\"}]" http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
+   für bthvn auch wieder aktivieren.
 
-  - Sehen Sie die richtige Okapi-Version, 5.3.0 ? 
+   jetzt stürzt mod-user-bl bei der Anmeldung OHNE Fehlermeldung ab (auch nett).
+  hier weiter
+
+  - Sehen Sie die Bärlauch-Module in Einstellungen - Installationsdetails ?
+
+  - Sehen Sie die richtige Okapi-Version, 6.1.3 ? 
 
   - Sieht auch sonst alles gut aus ?
 
