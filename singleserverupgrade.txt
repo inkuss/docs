@@ -41,40 +41,20 @@ Den Reboot des DB-Servers erst machen, wenn der "normale" Server wieder hoch gek
 
 Prüfe, ob alle Dienste nach dem Reboot neu gestartet wurden: <em>Okapi, postgres, docker, the docker containers</em> (do: docker ps --all | more ) <em>, Stripes and nginx.</em>
 
-Dies sind die offiziellen [Bärlauch wichtige Upgrade-Erwägungen](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105710262/Ramsons+R2+2024+Important+upgrade+considerations)
+Dies sind die offiziellen [Bärlauch wichtige Upgrade-Erwägungen](https://folio-org.atlassian.net/wiki/spaces/REL/pages/399081687/Sunflower+R1+2025+Important+upgrade+considerations)
 Mach das hier vor dem Upgrade:
 
 
-### I.ii) Aus den offiziellen Bärlauch Veröffentlichungshinweisen:
-#### 1.) mod-data-export
-Konfiguriere die Umgebungsvariable PLATFORM. Mögliche Werte sind okapi oder eureka. Der Standardwert ist okapi.
-  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"PLATFORM\",\"value\":\"okapi\"}" http://localhost:9130/_/env
-
-#### 2.) mod-data-export-worker
-	 Für S3-Speicher kompatible Umgebungsvariablen.
-  Einige Module benutzen S3-kompatiblen persistenten Speicher (AWS-S3 oder Minion-Server).
-  mod-data-export-worker benutzt es schon seit längerer Zeit.
-  Andere Module, die S3-(kompatiblen)-Speicher benutzen, sind:
-    mod-bulk-operations,
-    mod-data-import - für große MARC-21-Importdateien
-    mod-oai-pmh - Für Fehlerprotokolldateien
-    mod-lists - Um Inhalte von Listen exportieren zu können
-    mod-entities-links
-    mod-data-export
-
-  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_IDS_BATCH\",\"value\":\"1000\"}" http://localhost:9130/_/env
-  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EXPORT_FILES_MAX_POOLSIZE\",\"value\":\"10\"}" http://localhost:9130/_/env
-
-  Umgebungsvariablen mit AWS_* wurden umbenannt nach S3_* :  S3_URL , S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY,  S3_IS_AWS .
-
-  Neue Umgebungsvariablen wurden eingeführt: S3_SUB_PATH, S3_LOCAL_SUB_PATH . Das ist ein Unterpfad für die Dateispeicherung in S3. Für hbz-test habe ich in minio einen neuen Unterpfad "subpath" angelegt.
-  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"S3_SUB_PATH\",\"value\":\"subpath\"}" http://localhost:9130/_/env
-  curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"S3_LOCAL_SUB_PATH\",\"value\":\"subpath\"}" http://localhost:9130/_/env
+### I.ii) Aus den offiziellen Sonnenblumen Veröffentlichungshinweisen:
+#### 1.) mod-users-bl
+  (Okapi) curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EUREKA_LOGIN_PERMS\",\"value\":\"true\"}" http://localhost:9130/_/env
+  (Okapi) curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"ENABLE_FLOATING_COLLECTIONS\",\"value\":\"false\"}" http://localhost:9130/_/env
 
   (optional) Teste Browser-Zugriff auf den minio-Server:
     http://folio-minio.hbz-nrw.de:9090/
     Login: folioadmin, Passw: folIko23
     #Login: minioadmin, Passw: minioadmin
+
 
 ## II. Upgrade Okapi und Vorbereitung des Werkstattmodul-Upgrades
 ### II.i) Hole eine neue Version von "platform-complete"
@@ -82,7 +62,7 @@ Konfiguriere die Umgebungsvariable PLATFORM. Mögliche Werte sind okapi oder eur
   cd platform-complete
   git fetch
 
-Es gibt einen Zweig R2-2024-csp-1. Den installieren wir.
+Es gibt einen Zweig R1-2025-okapi-csp-3. Den installieren wir.
 Leihe diesen Zweig aus.
 Stecke lokale Änderungen in die Tasche. Das sollte nur stripes.config.js betreffen.
 Verwerfe alle Änderungen, die du vielleicht an den "install-json"-Dateien gemacht hast:
@@ -93,22 +73,67 @@ Verwerfe alle Änderungen, die du vielleicht an den "install-json"-Dateien gemac
   git restore package.json
  
   git stash save
-  git checkout R2-2024-csp-1 (vom 2. April 2025)
+  git checkout R1-2025-okapi-csp-3 (vom 3. Dezember 2025)
   git stash pop
 
 Den Zusammenführungs-Konflikt in stripes.config.js beheben.
 
 ### II.ii) Aufdatierung Okapi
   Die Okapi-Version hochziehen und Okapi neu starten.
-  Die Okapi-Version für "Bärlauch" aus install.json: okapi-6.1.3
 
-Baue Okapi aus den Quelldateien
-  cd /usr/folio/okapi
-  git fetch
-  git checkout v6.1.3
-  mvn clean install -DskipTests=true
-    ...
-    [INFO] BUILD SUCCESS
+# Baue Okapi aus den Quelldateien
+  Die Okapi-Version in den Okapi Versionsnotizen nachlesen: 6.2.5 oder höher für Sonnenblume.
+    (siehe https://github.com/folio-org/okapi/releases)
+
+  Neue Version von javac auf Ubuntu 22 installieren --- muss man nicht :
+  sudo apt update
+  sudo apt install openjdk-21-jdk
+  dann noch mit 
+   sudo update-alternatives --config javac
+  die 21 auswählen.
+
+   wir bleiben bei Okapi v6.1.3 --- v6.2.5 ist nicht kompilierbar.
+
+   cd /usr/folio/okapi
+   git fetch
+   git checkout v6.1.3.
+   mvn clean install -DskipTests=true
+   [INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for okapi 6.1.3:
+[INFO]
+[INFO] okapi .............................................. SUCCESS [  1.706 s]
+[INFO] okapi-testing ...................................... SUCCESS [  4.727 s]
+[INFO] okapi-common ....................................... SUCCESS [ 12.870 s]
+[INFO] okapi-test-module .................................. SUCCESS [  4.102 s]
+[INFO] okapi-test-auth-module ............................. SUCCESS [  3.143 s]
+[INFO] okapi-test-header-module ........................... SUCCESS [  2.609 s]
+[INFO] okapi-core ......................................... SUCCESS [ 20.513 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  49.944 s
+[INFO] Finished at: 2025-12-16T19:45:26+01:00
+[INFO] ------------------------------------------------------------------------
+
+-------------------------------------------------------
+            => BUILD FAILURE  für Okapi v6.2.5
+[INFO] Reactor Summary for okapi 6.2.5:
+[INFO]
+[INFO] okapi .............................................. SUCCESS [  1.732 s]
+[INFO] okapi-testing ...................................... FAILURE [  0.239 s]
+...
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  2.131 s
+[INFO] Finished at: 2025-12-16T19:34:41+01:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.0:compile (default-compile) on project okapi-testing: Fatal error compiling: error: release version 21 not supported -> [Help 1]
+
+  # Hole okapi-6.2.5.zip von https://github.com/folio-org/okapi/tree/v6.2.5 und kopiere es nach /usr/folio
+  #   cd /usr/folio
+  #   unzip okapi-6.2.5.zip
+  #   ln -s okapi-6.2.5 okapi  => das hat target nicht, man muss bauen.
 
 Neustart Okapi
   sudo systemctl restart okapi
@@ -118,9 +143,9 @@ Verfolge /var/log/folio/okapi/okapi.log .
 Okapi startet die Module neu. Verfolge das okapi.log. Okapi wird 5 Minuten oder so benötigen, bis alle Module wieder oben sind. Überprüfe, ob alle Module laufen:
 
 docker ps | grep "mod-" | wc
-  71
+  73
 
-Diese Zahl bezieht sich auf eine Vollinstallation von "Bromelie".
+Diese Zahl bezieht sich auf eine Vollinstallation von "Bärlauch".
   wenn man mod-dcb und mod-circulation-item nicht installiert hat, sind es nur 69.
   Auf folio-hbz5 hatte ich diese beiden Module aber installiert.
 
@@ -132,9 +157,10 @@ Diese Zahl bezieht sich auf eine Vollinstallation von "Bromelie".
   "id" : "okapi-6.1.3"
 } ]
 
-Das ist eine vollständige Plattform von "Bromelie", sowie die Bärlauch-version des Portals Okapi.
+Das ist eine vollständige Plattform von "Bärlauch", sowie die Bärlauch-version (wir können dieselbe für Sonneblume nehmen) des Portals Okapi.
 
 
+# hier weiter
 ### II.iii) Ziehe die Moduldeskriptorem aus der zentralen Registrierung
 
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '{ "urls": [ "https://folio-registry.dev.folio.org" ]  }' http://localhost:9130/_/proxy/pull/modules
@@ -195,9 +221,12 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
      mod-invoice-5.9.2
      mod-orders-12.9.11 .
 
-#### iii. mod-bulk-operations-2.1.12
+#### iii. mod-bulk-operations-2.1.12 Ramsons = Sonnenblume
   für stabiles Funktionieren setzen:
   JAVA_OPTIONS: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx2048m
+  Okapi:
+  SYSTEM_USER_NAME: mod-bulk-operations-system-user
+  SYSTEM_USER_PASSWORD={SYSTEM_USER_PASSWORD}
  
 #### iv. Inkompatible Hazelcast-Versionen in mod-remote-storage-3.3.5
   Während des Upgrades der Module werden die beiden Versionen "Bromelie" und "Bärlauch" von mod-remote-storage parallel laufen. Das funktioniert aber nur, wenn sie verschiedenen "Hazelcast"-Trauben zugeordnet sind. Setze den Namen der Hazelcast-Traube für die Bärlauch-Version auf "ramsons":
@@ -641,7 +670,11 @@ content-length: 62
 
 ## VII. Nach dem Upgrade
 
-### VII.i) Aus den Veröffentlichungshinweisen für "Bärlauch":
+### VII.i) Aus den Veröffentlichungshinweisen für "Sonneblume":
+After migration is executed, the Authority re-index must be executed according to instructions: https://github.com/folio-org/mod-search/tree/MSEARCH-966?tab=readme-ov-file#recreating-elasticsearch-index
+It’s crucial that during the MARC migration process, there is no interaction with the environment.
+
+(von Bärlauch)
 #### 1.) mod-search
  Indexierung von Standorten. Benutze die Reindexierungs-API mit resourceName = location :
  https://s3.amazonaws.com/foliodocs/api/mod-search/u/mod-search.html#api-IndexManagement-reindexInventoryRecords
@@ -674,6 +707,10 @@ content-length: 62
 
   Die Indexierung anstoßen
   ========================
+  Sonnenblume:
+  Instance re-index is required to be executed according to instructions: https://github.com/folio-org/mod-search/tree/v5.0.7?tab=readme-ov-file#indexing-of-instance-records
+
+  (von Bärlauch)
   Das mit den Token hat sich geändert (wg. RTR); hier eine ausführliche Beschreibung:
   https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1396980/Refresh+Token+Rotation+RTR
   Hole ein neues Zeichen und reindexiere:
