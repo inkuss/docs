@@ -720,6 +720,7 @@ transfer-encoding: chunked
   Entitätstypen, die reindexiert werden:
   INSTANCE, HOLDINGS, ITEM, SUBJECT, CONTRIBUTOR, CLASSIFICATION, CALL_NUMBER
   Mögliche Status: MERGE_COMPLETED, UPLOAD_IN_PROGRESS - UPLOAD_COMPLETED
+  "When entityType has value of item or holding then we have status details of Merge step and when entityType has value of subject, contributor or classification then we have status details of Upload step. Only for entity type of instance we can have statuses of both Merge and Upload steps."
 
   Das okapi.log verfolgen!
   mod-user-bl ist wieder abgestürzt => mit docker start neu gestartet.
@@ -750,7 +751,7 @@ transfer-encoding: chunked
 - Lösche den Browser-Cache (das ist wichtig, weil man sonst noch die alten Vordermodule sieht)
 - Gehe zur Seite "Systemeinstellungen"
     - es sollten keine inkompatiblen Abhängigkeiten zu sehen sein
-    - gucke, ob "Quesnelia CSP-9" auf der Seite angezeigt wird.
+    - gucke, ob "Sonnenblume CSP-3" auf der Seite angezeigt wird.
 - Überprüfe, ob man das Ausleihprotokoll herunterladen kann (Dadurch wird überprüft, ob mod-data-export-worker läuft).
      Test-User auf folio-hbz4 : Personen-Barcode 1234 => geht . Ausleihprotokoll kommt in minio an und wird im Browser zur Darstellung angeboten.
         - im 2. Versuch kommt das Ausleihprotokoll im minio an (erst nach einer neuen Ausleihe)
