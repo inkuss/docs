@@ -335,6 +335,20 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
       "name" : "RESET_PASSWORD_LINK_EXPIRATION_TIME",
       "value" : "3600"
     - in JAVA_OPTIONS hinzu fügen: -Xmx2048m
+
+#### x. Falsche Umgebungsvariable (Zeichenkette statt ganzzahlig) in mod-marc-migrations
+
+  # Konfiguriere mod-marc-migrations
+  cd ~/folio-install
+  # 1. Kopiere den Moduldeskriptor in eine Datei
+  curl -w '\n' -D -  http://localhost:9130/_/proxy/modules/mod-marc-migrations-2.0.3 > mod-marc-migrations-2.0.3-module-descriptor.json
+  # 2. Ändere im Hochfahr-Deskriptor manuell eine Umgebungsvariable:
+      "name" : "CHUNK_PERSIST_COUNT", "value" : "1000"   # steht auf "1_000"
+  # 3. Lösche den bisherigen Moduldeskriptor:
+  curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-marc-migrations-2.0.3
+  # 4. Sende den neuen Moduldeskriptor an /_/proxy/modules
+   curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-marc-migrations-2.0.3-module-descriptor.json http://localhost:9130/_/proxy/modules
+
    
 ### II.v) Lasse Prä-Upgrade-Skripte laufen
  - für Sonnenblume nichts zu tun.
@@ -384,7 +398,6 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
   Das läuft ca. 5 Minuten.
 
 
-# hier weiter
 ## IV. Stelle einen neuen FOLIO-Arbeitsbereich auf und aktiviere anschließend alle Module dieser neuen Plattform für Deinen Mandanten.
 
 Benutzer sollten jetzt nicht mehr mit dem System arbeiten, denn nachdem ein neues Backend aufgestellt wurde, wird das Frontend nicht mehr damit kompatibel sein und muss ebenfalls neu aufgestellt werden.
@@ -452,66 +465,65 @@ content-length: 112
   Neu in Sonnenblume:
     mod-linked-data:1.0.4
     mod-mosaic:1.0.0
-    mod-marc-migrations:2.0.3 ist nach 4 Minuten wieder herunter gekommen (folio-hbz5).
+    mod-marc-migrations:2.0.3
 
     mod-users-bl:7.9.3 (Bärlauch-Version) läuft 3x auf folio-hbz5!
 
   Wir schließen die Aktion ab, indem wir alle Module (Schaufenster und Werkstatt) mit einer einzigen Anfrage aktivieren, ohne weitere Module aufzustellen.
 
   Wir entscheiden uns dazu, Referenzdaten für alle Module zu laden.
+  # Memory auf dem Single Server muss auf 64 GB sein, 40 GB ist zu wenig.
 
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
-
-   curl: (52) Empty reply from server
-
-  - Memory stößt an seine Grenzen: 39,2 GB benutzt.
-    kswapd0 geht auf 100% CPU, alle anderen Prozesse ehrer unbelastet.
-    nach mehr als 10 Minuten bricht es ab.
-
-
-  # mod-search-4.0.11 ist nicht hoch gekommen.
-  # Aufgrund von mannigfaltigen Abhängigkeiten ist es nicht möglich, das Modul einzeln zu deployen.
-  # Wir entscheiden uns daher für einen erneuten Lauf mit "deploy=true".
-  # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dtrue
-  #  - da auch wieder Frontend-Module dabei sind, bricht der Lauf ab. Es werden keine Aktivierungen furchgeführt, aber mod-search-4.0.11 wird hochgefahren:
-
-  # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
-
 
   Wenn das fehlschlägt, finde den Grund dafür heraus, behebe die Fehlerursache und versuche es erneut, bis die Anfrage erfolgreich war.
 
   (Quesnelia: Das dauerte 90 Sekunden pro Mandant.)
+   
+
+  # mod-marc-migrations-2.0.3 ist nicht hoch gekommen.
+  #  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '[ { "id" : "mod-marc-migrations-2.0.3", "action" : "enable" } ]' http://localhost:9130/_/proxy/tenants/diku/install?simulate=true\&preRelease=false
+  #  HTTP/1.1 200 OK
+  # Content-Type: application/json
+  # content-length: 155
+  # [ {
+  #   "id" : "mod-marc-migrations-2.0.3",
+  #   "action" : "enable"
+  # }, {
+  #   "id" : "mod-search-4.0.15",  /* Bärlauch */
+  #   "from" : "mod-search-5.0.7", /* Sonnenblume */
+  #   "action" : "enable"
+  # } ]
+  #    curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '[ { "id" : "mod-marc-migrations-2.0.3", "action" : "enable" } ]' http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dfalse
+
+
 
   Wiederhole diesen Schritt für eventuelle weitere Mandanten (solche, die ebenfalls platform-complete installiert haben) auf deinem System.
-  - für bthvn dauert da 5 Minuten.
 
   Alte Module, die noch laufen, aber nun nicht mehr benötigt werden, werden wir im "Aufräum"-Kapitel entfernen.
  
-       73 Bärlauch-Werkstattmodule wurden während "deploy=true" hochgefahren (70 ohne mod-dcb, mod-circluation-item und mod-reporting).
-       71 Werkstattmodule liefen schon vorher (Bromelie).
-   Es sollte nun 144 (141) Module auf deinem Server geben. Versuche
+       73 Sonnenblumen-Werkstattmodule wurden während "deploy=true" hochgefahren (70 ohne mod-dcb, mod-circluation-item und mod-reporting).
+       73 Werkstattmodule liefen schon vorher (Bärlauch) (70 ohne mod-dcb, mod-circluation-item und mod-reporting).
+   Es sollte nun 146 (140) Module auf deinem Server geben. Versuche
 
   docker ps | grep "mod-" | wc
-    144 (141) sollen es sein.
+    146 (140) sollen es sein.
 
-  Jetzt sind die Module der Bärlauch-Version für deinen Mandanten aktiviert:
+  Jetzt sind die Module der Sonnenblumen-Version für deinen Mandanten aktiviert:
 
   curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules | grep id | wc
-  147 (152 mit mod-dcb, mod-circulation-item, edge-dcb, mod-reporting und folio_ldp)
-  curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules | grep id | wc
-  150
-
+  157 (154 ohne mod-dcb, mod-circulation-item und mod-reporting)
 
   Diese Zahl ist die Summe folgender Anzahlen:
 
- Bärlauch CSP-1 Veröffentlichung (siehe ~/folio-install/modules.quesnelia.csv):
-         65 Schaufenstermodule
-       + 13 Kantenmodule
-       + 73 Werkstattmodule
+ Sonnenblume CSP-3 Veröffentlichung (siehe ~/folio-install/modules.quesnelia.csv):
+         68 Schaufenstermodule
+       + 12 Kantenmodule
+       + 76 Werkstattmodule
        +  1 Okapi-Modul (Portal) (6.1.3) 
- Summe: 152
+ Summe: 157
 
-  Das sind alle Module der Veröffentlichung R2-2024 "Bärlauch".
+  Das sind alle Module der Veröffentlichung R1-2025 "Sonnenblume".
 
 ## V. Bringe das neue Vorderende (Schaufenster) an den Start
   Halte den alten Stripes-Container an:
@@ -543,40 +555,15 @@ content-length: 112
   Browser-Cache löschen.
   Im Browser am System anmelden: Einloggen auf https://hbz-test.folio.hbz-nrw.de, diku_admin
 
-   mod-user-bl ist beim Anmelden herunter gekommen:
-  6:29:47 [646834/bl-users] [diku] [] [mod_users_bl] INFO  RestRouting          invoking postBlUsersLoginWithExpiry
-Terminating due to java.lang.OutOfMemoryError: Java heap space
-  # mod-users-bl deaktivieren und Java Heap Space erhöhen:
-  # erst ein Testlauf
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"folio_users-11.0.11\",\"action\":\"disable\"},{\"id\":\"folio_stripes-core-10.2.5\",\"action\":\"disable\"},{\"id\":\"mod-users-bl-7.9.3\",\"action\":\"disable\"}]" http://localhost:9130/_/proxy/tenants/diku/install?simulate=true\&preRelease=false
-  # dann das Modul und abhängige deaktivieren
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"folio_users-11.0.11\",\"action\":\"disable\"},{\"id\":\"folio_stripes-core-10.2.5\",\"action\":\"disable\"},{\"id\":\"mod-users-bl-7.9.3\",\"action\":\"disable\"}]" http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dfalse
-   Auch für Beethoven deaktivieren.
-      nun noch das Modul aus dem Discovery entfernen (auch, wenn es schon abgestürzt ist):
-      curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-users-bl-7.9.3
-  # Moduldeskriptor ändern:
-    vim mod-users-bl-7.9.3-module-descriptor.json
-    füge hinzu:  -Xmx2048m
-    curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-users-bl-7.9.3
-    curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-users-bl-7.9.3-module-descriptor.json http://localhost:9130/_/proxy/modules
-  # Neu hochfahren mod-users-bl
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-users-bl-7.9.3\",\"action\":\"enable\"}]" http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dtrue
-  # Modul & abhängige wieder aktivieren:
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-users-bl-7.9.3\",\"action\":\"enable\"},{\"id\":\"folio_users-11.0.11\",\"action\":\"enable\"},{\"id\":\"folio_stripes-core-10.2.5\",\"action\":\"enable\"}]" http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
-   für bthvn auch wieder aktivieren.
+  - Sehen Sie die Sonnenblumen-Module in Einstellungen - Installationsdetails ?
 
-   jetzt stürzt mod-user-bl bei der Anmeldung OHNE Fehlermeldung ab (auch nett).
-  hier weiter
-
-  - Sehen Sie die Bärlauch-Module in Einstellungen - Installationsdetails ?
-
-  - Sehen Sie die richtige Okapi-Version, 6.1.3 ? 
+  - Sehen Sie die richtige Okapi-Version, 6.2.5 ? 
 
   - Sieht auch sonst alles gut aus ?
 
   Man kann jetzt wieder von der Nutzerschnittstelle auf das System gehen.
   Es müssen aber noch Änderungen in den Erlaubnismengen und langlaufende Migrationsarbeiten ausgeführt werden, bevor man das System wieder produktiv nutzen kann.
-  Sie sehen außerdem die Katalogdaten nich nicht, weil noch eine Reindexierung ausgeführt werden muss.
+  Sie sehen außerdem die Katalogdaten noch nicht, weil noch eine Reindexierung ausgeführt werden muss.
 
 
 ## VI. Aufräumen
@@ -585,27 +572,27 @@ Terminating due to java.lang.OutOfMemoryError: Java heap space
 ```
   docker system prune -a
 ```
-  Total reclaimed space: 10.64GB
+  Total reclaimed space: 15.72GB
 
-  Entferne alle ungenutzen Behältnisse: Lösche alle Module, die nicht Teil des Veröffentlichungspaketes "Bromelie" sind, aus der Entdeckungsschicht des Portals.
+  Entferne alle ungenutzen Behältnisse: Lösche alle Module, die nicht Teil des Veröffentlichungspaketes "Sonnenblume" sind, aus der Entdeckungsschicht des Portals.
   Entferne alte Modulversionen auf dieser Weise:
 ```
-curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-agreements-5.5.2
-curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-audit-2.7.0
+curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-agreements-7.1.5
+curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-audit-2.10.2
 ...
-curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-z3950-3.3.2
+curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-users-bl-7.9.3
 ```
 
-  Das sind 64 Module der "Mohnblume" (alle bis auf 3).
+  Das sind 68 Module von "Bärlach" (alle 73 Bärlauch-Module bis auf die 3, die auch in Sonnenblume vorkommen. Außerdem nicht: mod-circulation-item und mod-reporting (Bärlauch-Versionen). Jedoch mit mod-dcb-1.2.8 (Bärlauch), welches ich in Bärlauch installiert hatte.)
 
-  Außerdem auf hbz-4 noch 10 Kantenmodule, die in niedrigerer Version als "Bromelie" noch aufgestellt sind.
+  Außerdem auf folio-hb5 noch 5 Kantenmodule, die in niedrigerer Version noch aufgestellt sind:
      Finde sie heraus mit:
      docker ps | grep edge- | sort -k 2
 
-   Ich habe dieses Skript erzeugt und ausgeführt. Es enthält nur (und alle) Mohnblumen-Instanzen, die nicht auch Teil von Bromelie sind, sowie die überzähligen Kantenmodule.
-   Alle 74 jetzt noch zu löschenden Module (inkl. Kantenmodule) stehen in diesem Skript:
+   Ich habe dieses Skript erzeugt und ausgeführt. Es enthält nur (und alle) Bärlauch-Instanzen, die nicht auch Teil von Sonnenblume sind, sowie die überzähligen Kantenmodule.
+   Alle 73 jetzt noch zu löschenden Module (inkl. Kantenmodule) stehen in diesem Skript:
    cd ~/folio-install
-   ./dockerps.todelete.derMohnblume.sh
+   ./dockerps.todelete.desBärlauch.sh
 
    # mod-graphql-1.12.1 auf folio-hbz4 und folio-hbz3 noch zusätzlich entfernt:
   curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-graphql-1.12.1
@@ -613,49 +600,28 @@ curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-z3950-
   curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-search-3.0.9
    # auf folio-hbz3 auch noch mod-orders-12.7.4
   curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-orders-12.7.4
-   # dafür fehlt nun ein Modul (es sind nur noch 68): mod-settings-1.0.3 ist nicht hoch gekommen.
-   # Wir deployen mod-settings-1.0.3 nach:
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-settings-1.0.3\",\"action\":\"enable\"}]" http://localhost:9130/_/proxy/tenants/wdr/install?simulate=true\&preRelease=false
-HTTP/1.1 200 OK
-Content-Type: application/json
-content-length: 62
-
-[ {
-  "id" : "mod-settings-1.0.3",
-  "action" : "uptodate"
-} ]
-  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-settings-1.0.3\",\"action\":\"enable\"}]" http://localhost:9130/_/proxy/tenants/wdr/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dtrue
-HTTP/1.1 200 OK
-Content-Type: application/json
-content-length: 62
-
-[ {
-  "id" : "mod-settings-1.0.3",
-  "action" : "uptodate"
-} ]
  
-   Jetzt könnte man mod-reporting (neu in Bärlauch) und folio_ldp dazu installieren.
+   (Jetzt könnte man mod-reporting und folio_ldp dazu installieren.)
 
 ### Ergebnis
-  Für "Bromelien"-Auskopplung, CSP-9
-  71 Werkstattmodule, "mod-\*" enthält die Liste install.json (69 ohne mod-dcb und mod-circulation-item).
-  Diese 71 Werkstattmodule sind jetzt für deinen Mandanten aktiviert.
-  71 Behältnisse für diese Module laufen in deinem Hafenarbeiter-System.
+  Für "Sonnenblumen"-Auskopplung, CSP-3
+  76 Werkstattmodule, "mod-\*" enthält die Liste install.json (73 ohne mod-dcb, mod-circulation-item und mod-reporting).
+  Diese 73 Werkstattmodule sind jetzt für deinen Mandanten aktiviert.
+  73 Behältnisse für diese Module laufen in deinem Hafenarbeiter-System.
 
   Hole dir schließlich noch einmal eine Liste der aufgestellten Werkstattmodule:
   
   ```
   curl -w '\n' -D - http://localhost:9130/_/discovery/modules | grep srvcId | grep mod- | wc
- 71
+ 73
   ```
   
   Vergleiche diese Anzahl mit der deiner laufenden Hafenarbeiter-Behältnisse:
   
   ```
   docker ps | grep "mod-" | wc
-    71
+    73
   ```
-    Es dürfen nur 69 sein.
 
   Führe eine Gesundheitsprüfung durch:
   ```
@@ -663,7 +629,7 @@ content-length: 62
   ```
   Ist alles in Ordnung ?
   
-   Herzlichen Glückwunsch ! Dein System "Bromelie" ist nun vollständig und aufgeräumt !
+   Herzlichen Glückwunsch ! Dein System "Sonnenblume" ist nun vollständig und aufgeräumt !
 
 
 ## VII. Nach dem Upgrade
@@ -672,93 +638,96 @@ content-length: 62
 After migration is executed, the Authority re-index must be executed according to instructions: https://github.com/folio-org/mod-search/tree/MSEARCH-966?tab=readme-ov-file#recreating-elasticsearch-index
 It’s crucial that during the MARC migration process, there is no interaction with the environment.
 
+  Hole ein neues Zeichen und reindexiere Authorities:
+     curl -s -S -D - -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -H "Accept: application/json" -d '{ "tenant" : "diku", "username" : "diku_admin", "password" : "admin" }' http://localhost:9130/authn/login-with-expiry
+  Das TOKEN ist der Teil zwischen "Set-Cookie: folioAccessToken=" und dem ersten Semikolon;
+      export TOKEN=...
+       curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "recreateIndex": true, "resourceName": "authority", "indexSettings": { "numberOfShards": 2, "numberOfReplicas": 4, "refreshInterval": 1 } }' http://localhost:9130/search/index/inventory/reindex
+       HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Tue, 23 Dec 2025 18:55:57 GMT
+transfer-encoding: chunked
+
+{"id":"a9ba2d5b-6f6f-4354-9784-342ca0de050b","jobStatus":"In progress","submittedDate":"2025-12-23T18:55:56.934865609Z"}
+
+       # Updating index settings
+       curl -w '\n' -D - -X PUT -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "resourceName": "authority", "indexSettings": { "numberOfReplicas": 4, "refreshInterval": 60 } }' http://localhost:9130/search/index/settings
+       HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Tue, 23 Dec 2025 18:58:33 GMT
+transfer-encoding: chunked
+
+{"status":"success"}
+ 
+  # Monitoring authority reindex process
+       curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" http://localhost:9130/authority-storage/reindex/a9ba2d5b-6f6f-4354-9784-342ca0de050b
+       HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Tue, 23 Dec 2025 19:01:01 GMT
+transfer-encoding: chunked
+
+{"id":"a9ba2d5b-6f6f-4354-9784-342ca0de050b","published":0,"jobStatus":"Ids published","resourceName":"Authority","submittedDate":"2025-12-23T18:55:56.934866Z"}
+
 (von Bärlauch)
-#### 1.) mod-search
+#### VII.ii) mod-search
  Indexierung von Standorten. Benutze die Reindexierungs-API mit resourceName = location :
  https://s3.amazonaws.com/foliodocs/api/mod-search/u/mod-search.html#api-IndexManagement-reindexInventoryRecords
+  curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "recreateIndex": true, "resourceName": "location", "indexSettings": { "numberOfShards": 2, "numberOfReplicas": 4, "refreshInterval": 1 } }' http://localhost:9130/search/index/inventory/reindex
+  HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Tue, 23 Dec 2025 19:03:20 GMT
+transfer-encoding: chunked
 
-#### 2.) mod-inventory-storage
-  Asynchrone Migration muss nach dem Upgrade ausgeführt werden. Führe folgenden Endpoint aus:
-  POST /inventory-storage/migrations/jobs
-  Body:
-{
-    "migrations": [
-        "publicationPeriodMigration"
-    ]
-}
-  Der Status der Migration kann so überprüft werden:
-    GET /inventory-storage/migrations/jobs/<jobId>
-  Am Ende muss ein SQL-Skript ausgeführt werden:
-    SELECT 1 FROM <tenant>_mod_inventory_storage.instance WHERE jsonb -> 'publicationPeriod' IS NOT NULL LIMIT 1;
-  Wenn das nichts zurück gibt, war die Migration erfolgreich.
+{"id":"e9af8065-3144-419d-ae13-9049f1c843e2","jobStatus":"Completed","submittedDate":"Tue Dec 23 19:03:18 GMT 2025"}
 
-#### 3.) Titeldaten
-  Die Abbildungsregeln für MARC-Instanzen wurden aktualisiert/erweitert.
-  Folge diesen Anweisungen: https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/135856129
+### VII.iii) Neuaufbau des "Elasticsearch"-Indexes "Inventar"
 
-### VII.ii) Neuaufbau des "Elasticsearch"-Indexes
-
-  Bärlauch: Nach dem Upgrade muss eine neue API benutzt werden, um die Titeldatensätze zu indexieren.
+  Nach dem Upgrade muss eine neue API benutzt werden, um die Titeldatensätze zu indexieren.
   Der alte Endpoint /search/index/inventory/reindex funktioniert nicht mehr.
 
   Wir machen einen "vollen Reindex":
 
-  Die Indexierung anstoßen
-  ========================
+  Die Inventar-Reindexierung anstoßen
+  ===================================
   Sonnenblume:
   Instance re-index is required to be executed according to instructions: https://github.com/folio-org/mod-search/tree/v5.0.7?tab=readme-ov-file#indexing-of-instance-records
 
-  (von Bärlauch)
-  Das mit den Token hat sich geändert (wg. RTR); hier eine ausführliche Beschreibung:
-  https://folio-org.atlassian.net/wiki/spaces/FOLIJET/pages/1396980/Refresh+Token+Rotation+RTR
-  Hole ein neues Zeichen und reindexiere:
-     curl -s -S -D - -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" -H "Accept: application/json" -d '{ "tenant" : "wdr", "username" : "folio_admin", "password" : "********" }' http://localhost:9130/authn/login-with-expiry
-  Das TOKEN ist der Teil zwischen "Set-Cookie: folioAccessToken=" und dem ersten Semikolon;
-      export TOKEN=...
-
-      Ab "Bärlauch" ("R"-Auskopplung) geht es so:
-       curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" -d '{"entityTypes": ["instance", "subject", "contributor", "classification"]}' http://localhost:9130/search/index/instance-records/reindex/full
-      auch erst ab Ransoms: Wenn das einmal gemacht wurde ("1. Schritt: Datenaggregation/Merge", "2. Schritt: Upload") muss danach nur noch der 2. Schritt aufgerufen werden, das geschieht mit dem Endpoint /upload. Siehe hier: https://github.com/folio-org/mod-search?tab=readme-ov-file#indexing-of-instance-records
-{
-  "entityTypes": ["instance", "subject", "contributor", "classification"]
-}
-  Um den asynchronen Prozess zu überwachen können wir diesen Endpunkt ausführen:
-    GET /search/index/instance-records/reindex/status
-
-  Die genaue Spezifikation der API findet sich hier: https://github.com/folio-org/mod-search/tree/v4.0.0?tab=readme-ov-file#indexing-of-instance-records
-
-  (alt, Bromelie:) Die folgende Berechtigung muss dem Nutzer folio_admin zugewiesen worden sein:
-    search.index.inventory.reindex.post (Search - starts inventory reindex operation)
-
-  Es gibt keine "Ende-zu-Ende"-Überwachung, aber es ist möglich, den Vorgang teilweise zu überwachen.
-  Benutze die Katalog-API, um zu überprüfen, wie vile Datensätze an das Kafka-Thema veröffentlicht worden sind:
-      curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/8b76ab8e-8250-43ae-b386-c368b1dc3639
+   # 1. Schritt: Datenaggregation/Merge
+       curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "indexSettings": { "numberOfShards": 2, "numberOfReplicas": 4, "refreshInterval": 1 } }' http://localhost:9130/search/index/instance-records/reindex/full
 HTTP/1.1 200 OK
-Content-Type: application/json
+Date: Tue, 23 Dec 2025 19:10:56 GMT
 transfer-encoding: chunked
 
+     # mglw. hätte man nur das hier machen müssen ("Upload"), aber das geht jetzt nicht mehr:
+     # 2. Schritt: Upload
+       curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{"entityTypes": ["instance", "subject", "contributor", "classification", "call-number"]}' http://localhost:9130/search/index/instance-records/reindex/upload
+       HTTP/1.1 400 Bad Request
+Content-Type: application/json
+Date: Tue, 23 Dec 2025 19:12:10 GMT
+Connection: close
+transfer-encoding: chunked
+
+{"errors":[{"message":"Reindex Upload in Progress","type":"RequestValidationException","code":"validation_error","parameters":[{"key":"entityType","value":"instance"}]}],"total_records":1}
+      ab Ransoms: Wenn das einmal gemacht wurde ("1. Schritt: Datenaggregation/Merge", "2. Schritt: Upload") muss danach nur noch der 2. Schritt aufgerufen werden, das geschieht mit dem Endpoint /upload. Siehe hier: https://github.com/folio-org/mod-search?tab=readme-ov-file#indexing-of-instance-records
 {
-  "id" : "1d61604c-8441-45c4-9cb5-fb91a4ab73fd",
-  "published" : 31000,
-  "jobStatus" : "In progress",
-  "resourceName" : "Instance",
-  "submittedDate" : "2025-03-21T10:32:40.729+00:00"
+  "entityTypes": ["instance", "subject", "contributor", "classification", "call-number"]
 }
 
-  Jetzt Kafka wieder anschalten (solange Kafka nicht an ist, wird nichts indexiert):
-    docker-compose up -d
+  # Um den asynchronen Prozess zu überwachen können wir diesen Endpunkt ausführen:
+       curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" http://localhost:9130/search/index/instance-records/reindex/status
 
-  Im okapi.log:
-  15:35:55 [] [] [] [] INFO  ?                    042744/search RES 200 3181154us mod-search-3.2.7 http://10.9.2.86:19124/search/index/inventory/reindex
-  ...
-  15:35:56 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4 14:35:56 [042744/search;780402/instance-storage] [diku] [4e3dd2f7-f8de-45d2-bdc6-734084470a42] [mod_inventory_storage] INFO  DomainEventPublisher Producer write queue empty again...
-  15:35:57 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4 14:35:57 [042744/search;780402/instance-storage] [diku] [4e3dd2f7-f8de-45d2-bdc6-734084470a42] [mod_inventory_storage] INFO  DomainEventPublisher Producer write queue full...
-  usw.
-  15:36:13 [] [] [] [] INFO  ?                    mod-inventory-storage-27.1.4 14:36:13 [] [] [] [] INFO  KafkaConsumerWrapper businessHandlerCompletionHandler:: Consumer - id: 0 subscriptionPattern: SubscriptionDefinition(eventType=instance, subscriptionPattern=quesnelia.\w{1,}.inventory.instance) Committed offset: 42
-  ...
-  das geht bis Committed offset: 224829, alles innerhalb von 60 Sekunden.
-  224.826 Titeldatensätze am 14.4.2025 auf hbz-test.
+  Die genaue Spezifikation der API findet sich hier: https://github.com/folio-org/mod-search/tree/v4.0.0?tab=readme-ov-file#indexing-of-instance-records
+  Entitätstypen, die reindexiert werden:
+  INSTANCE, HOLDINGS, ITEM, SUBJECT, CONTRIBUTOR, CLASSIFICATION, CALL_NUMBER
+  Mögliche Status: MERGE_COMPLETED, UPLOAD_IN_PROGRESS - UPLOAD_COMPLETED
 
+  Das okapi.log verfolgen!
+  mod-user-bl ist wieder abgestürzt => mit docker start neu gestartet.
+  Im Browser sieht man jetzt, dass sich die Anzahl der Katalogeinträge langsam wieder aufbaut (Schauen bei "Quelle").
+  Instanten stehen nach 34 Minuten auf "UPLOAD_COMPLETED" und sind von dann an vollständig im Katalog auffindbar.
+  224.829 Titeldatensätze am 23.12.2025 auf hbz-test.
+  Indexierung wird fertig in ca. 35 Minuten.
+  
   In der Datenbank:
   select count(*) from wdr_mod_inventory_storage.instance;
  count  
@@ -766,48 +735,12 @@ transfer-encoding: chunked
  225037
 (1 row)
  
-  Den Job-Status noch einmal überprüfen; alle Katalogdatensätze sind nun (an Kafka) veröffentlicht worden.
-  Das passierte innerhalb von einer Minute:
-  curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/1d61604c-8441-45c4-9cb5-fb91a4ab73fd
-HTTP/1.1 200 OK
-Content-Type: application/json
-transfer-encoding: chunked
-
-{
-  "id" : "1d61604c-8441-45c4-9cb5-fb91a4ab73fd",
-  "published" : 225000,
-  "jobStatus" : "In progress",
-  "resourceName" : "Instance",
-  "submittedDate" : "2025-03-21T10:32:40.729+00:00"
-}
-
-  Im Browser sieht man jetzt, dass sich die Anzahl der Katalogeinträge langsam wieder aufbaut (Schauen bei "Quelle").
-  Nach 17 Minuten sind 60.000 Einträge wieder aufgebaut.
-  Dabei rödelt mod-inventory-storage im Okapi-Log wie blöde.
-  Bricht nach 147.338 Sätzen nach ca. 40 Minuten ab. Weil man Kafka anfangs ausgeschaltet hatte ?
-  Noch einmal versuchen (Kafka an lassen).
-  Jetzt kommt sofort der Job-Status "IdsPublished":
-  curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: wdr" -H "Content-type: application/json" http://localhost:9130/instance-storage/reindex/8b76ab8e-8250-43ae-b386-c368b1dc3639
-HTTP/1.1 200 OK
-Content-Type: application/json
-transfer-encoding: chunked
-
-{
-  "id" : "8b76ab8e-8250-43ae-b386-c368b1dc3639",
-  "published" : 225037,
-  "jobStatus" : "Ids published",
-  "resourceName" : "Instance",
-  "submittedDate" : "2025-03-21T11:15:29.523+00:00"
-}
-
-  Indexierung wird fertig in ca. 40 Minuten.
   mod-search hört nun auf zu rödeln, die letzte Meldung ist
   17:13:04 [329919/proxy;726590/tenant] [wdr] [] [mod-search] INFO  ResourceService      Records indexed to elasticsearch [indexRequests: 90, removeRequests: 0]
   mod-inventory-storage ebenfalls.
 
-   Bis hierher noch einmal 3,5 Std benötigt (09:30 bis 13:00 Uhr)
-
-  Wiederhole den Reindexierungsprozess für andere Mandanten, die du vielleicht auf deinem Server beherbergst, und die auch zur Bromelie migriert sind.
+  # hier weiter
+  Wiederhole den Reindexierungsprozess für andere Mandanten, die du vielleicht auf deinem Server beherbergst, und die auch zur Sonnenblume migriert sind.
 
 ### VII.iii) Berechtigungen aktualisieren
   Aktualisiere die Berechtigungen, so wie hier beschrieben: [Aktualisiere Berechtigungen](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105775925/Quesnelia+R1+2024+Permissions+Updates).
