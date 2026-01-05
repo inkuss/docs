@@ -44,7 +44,8 @@ Prüfe, ob alle Dienste nach dem Reboot neu gestartet wurden: <em>Okapi, postgre
 Dies sind die offiziellen [Bärlauch wichtige Upgrade-Erwägungen](https://folio-org.atlassian.net/wiki/spaces/REL/pages/399081687/Sunflower+R1+2025+Important+upgrade+considerations)
 Mach das hier vor dem Upgrade:
 
-
+  Source: FOLIO 80
+          MARC   5
 ### I.ii) Aus den offiziellen Sonnenblumen Veröffentlichungshinweisen:
 #### 1.) mod-users-bl
   (Okapi) curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EUREKA_LOGIN_PERMS\",\"value\":\"true\"}" http://localhost:9130/_/env
@@ -61,6 +62,7 @@ Mach das hier vor dem Upgrade:
  Hole die neue Version von "platform-complete", wechsele in das Verzeichnis:
   cd platform-complete
   git fetch
+  # folio-hbz2: war R2-2024-csp-1
 
 Es gibt einen Zweig R1-2025-okapi-csp-3. Den installieren wir.
 Leihe diesen Zweig aus.
@@ -73,11 +75,60 @@ Verwerfe alle Änderungen, die du vielleicht an den "install-json"-Dateien gemac
   git restore package.json
  
   git stash save
-  git checkout R1-2025-okapi-csp-3 (vom 3. Dezember 2025)
+  git checkout R1-2025-okapi-csp-4 (vom 23. Dezember 2025)
   git stash pop
 
 Den Zusammenführungs-Konflikt in stripes.config.js beheben.
 
+Folgende Änderungen haben von R1-2025-okapi-csp-3 auf R1-2025-okapi-csp-4 stattgefunden:
+diff /tmp/install.json install.json
+41c41
+<   "id" : "mod-licenses-6.2.2",
+---
+>   "id" : "mod-licenses-6.2.3",
+53c53
+<   "id" : "mod-source-record-storage-5.10.11",
+---
+>   "id" : "mod-source-record-storage-5.10.12",
+77c77
+<   "id" : "mod-login-7.13.0",
+---
+>   "id" : "mod-login-7.13.1",
+95c95
+<   "id" : "mod-service-interaction-4.2.2",
+---
+>   "id" : "mod-service-interaction-4.2.3",
+110c110
+<   "id" : "mod-agreements-7.2.2",
+---
+>   "id" : "mod-agreements-7.2.3",
+206c206
+<   "id" : "mod-source-record-manager-3.10.7",
+---
+>   "id" : "mod-source-record-manager-3.10.8",
+281c281
+<   "id" : "mod-serials-management-2.0.3",
+---
+>   "id" : "mod-serials-management-2.0.4",
+287,289d286
+<   "id" : "mod-marc-migrations-2.0.3",
+<   "action" : "enable"
+< }, {
+350c347
+<   "id" : "mod-patron-6.3.2",
+---
+>   "id" : "mod-patron-6.3.3",
+456,461d452
+<   "action" : "enable"
+< }, {
+<   "id" : "mod-mosaic-1.0.0",
+<   "action" : "enable"
+< }, {
+<   "id" : "folio_mosaic-settings-1.0.0",
+
+D.h.  mod-marc-migrations, mod-mosaic und folio_mosaic-settings (alle neu in Sonnenblume) sind wieder herausgeflogen. Außerdem habe 8 Module ein Versionsupdate bekommen.
+
+hier weiter folio-hbz2
 ### II.ii) Aufdatierung Okapi
   Die Okapi-Version hochziehen und Okapi neu starten.
 
