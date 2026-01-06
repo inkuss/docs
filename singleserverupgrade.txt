@@ -140,7 +140,6 @@ Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu:
   "action" : "enable"
 }, {
 
-hier weiter folio-hbz2
 ### II.ii) Aufdatierung Okapi
   Die Okapi-Version hochziehen und Okapi neu starten.
 
@@ -151,8 +150,10 @@ hier weiter folio-hbz2
   Java JDK Version von 17 auf 21 hoch ziehen, die neueren Okapi-Versionen sind sonst nicht kompilierbar
   *****************************************************************************************************
   Neue Version von javac auf Ubuntu 22 installieren
+  # Niko hat auf folio-hbz2 das "universe" Ubuntu Repo installiert
   sudo apt update
   sudo apt install openjdk-21-jdk
+# hier weiter folio-hbz2
   dann noch mit 
    sudo update-alternatives --config javac
   die 21 auswählen: 0 (auto mode) auswählen.
