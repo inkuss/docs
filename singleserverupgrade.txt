@@ -41,14 +41,14 @@ Den Reboot des DB-Servers erst machen, wenn der "normale" Server wieder hoch gek
 
 Prüfe, ob alle Dienste nach dem Reboot neu gestartet wurden: <em>Okapi, postgres, docker, the docker containers</em> (do: docker ps --all | more ) <em>, Stripes and nginx.</em>
 
-Dies sind die offiziellen [Bärlauch wichtige Upgrade-Erwägungen](https://folio-org.atlassian.net/wiki/spaces/REL/pages/399081687/Sunflower+R1+2025+Important+upgrade+considerations)
+Dies sind die offiziellen [Sonnenblume wichtige Upgrade-Erwägungen](https://folio-org.atlassian.net/wiki/spaces/REL/pages/399081687/Sunflower+R1+2025+Important+upgrade+considerations)
 Mach das hier vor dem Upgrade:
 
   Source: FOLIO 80
           MARC   5
 ### I.ii) Aus den offiziellen Sonnenblumen Veröffentlichungshinweisen:
 #### 1.) mod-users-bl
-  (Okapi) curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EUREKA_LOGIN_PERMS\",\"value\":\"true\"}" http://localhost:9130/_/env
+  (Okapi) curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EUREKA_LOGIN_PERMS\",\"value\":\"false\"}" http://localhost:9130/_/env
   (Okapi) curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"ENABLE_FLOATING_COLLECTIONS\",\"value\":\"false\"}" http://localhost:9130/_/env
 
   (optional) Teste Browser-Zugriff auf den minio-Server:
@@ -153,7 +153,6 @@ Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu:
   # Niko hat auf folio-hbz2 das "universe" Ubuntu Repo installiert
   sudo apt update
   sudo apt install openjdk-21-jdk
-# hier weiter folio-hbz2
   dann noch mit 
    sudo update-alternatives --config javac
   die 21 auswählen: 0 (auto mode) auswählen.
@@ -180,63 +179,70 @@ Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu:
 
   cd /usr/folio/okapi
   git fetch
-  git checkout v6.2.5 (es gibt nur "origin" - dadurch wird von origin gezogen und automatisch eine lokale Branch v6.2.5 angelegt)
+  git checkout v7.0.1 (es gibt nur "origin" - dadurch wird von origin gezogen und automatisch eine lokale Branch v7.0.1 angelegt) vom 13. November 2025
 
    mvn clean install -DskipTests=true
 [INFO] ------------------------------------------------------------------------
-[INFO] Reactor Summary for okapi 6.2.5:
+[INFO] Reactor Summary for okapi 7.0.1:
 [INFO]
-[INFO] okapi .............................................. SUCCESS [  3.154 s]
-[INFO] okapi-testing ...................................... SUCCESS [  3.717 s]
-[INFO] okapi-common ....................................... SUCCESS [  9.677 s]
-[INFO] okapi-test-module .................................. SUCCESS [  4.581 s]
-[INFO] okapi-test-auth-module ............................. SUCCESS [  4.012 s]
-[INFO] okapi-test-header-module ........................... SUCCESS [  3.196 s]
-[INFO] okapi-core ......................................... SUCCESS [ 40.078 s]
+[INFO] okapi .............................................. SUCCESS [  8.313 s]
+[INFO] okapi-testing ...................................... SUCCESS [ 10.128 s]
+[INFO] okapi-common ....................................... SUCCESS [01:19 min]
+[INFO] okapi-test-module .................................. SUCCESS [  4.865 s]
+[INFO] okapi-test-auth-module ............................. SUCCESS [  5.894 s]
+[INFO] okapi-test-header-module ........................... SUCCESS [  3.516 s]
+[INFO] okapi-core ......................................... SUCCESS [01:02 min]
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  01:08 min
-[INFO] Finished at: 2025-12-19T14:45:00+01:00
+[INFO] Total time:  03:05 min
+[INFO] Finished at: 2026-01-07T11:55:23+01:00
 [INFO] ------------------------------------------------------------------------
 
-Neustart Okapi
-  sudo systemctl restart okapi
+ Neustart Okapi
+   sudo systemctl restart okapi
 
-Verfolge /var/log/folio/okapi/okapi.log . 
+ Verfolge /var/log/folio/okapi/okapi.log . 
 
-Okapi startet die Module neu. Verfolge das okapi.log. Okapi wird 5 Minuten oder so benötigen, bis alle Module wieder oben sind. Überprüfe, ob alle Module laufen:
+ Okapi startet die Module neu. Verfolge das okapi.log. Okapi wird 5 Minuten oder so benötigen, bis alle Module wieder oben sind. Überprüfe, ob alle Module laufen:
 
-docker ps | grep "mod-" | wc
-  73
+ docker ps | grep "mod-" | wc
+   73
 
-Diese Zahl bezieht sich auf eine Vollinstallation von "Bärlauch".
-  wenn man mod-dcb und mod-circulation-item nicht installiert hat, sind es nur 69.
-  Auf folio-hbz5 hatte ich diese beiden Module aber installiert.
+ Diese Zahl bezieht sich auf eine Vollinstallation von "Bärlauch".
+   wenn man mod-dcb und mod-circulation-item nicht installiert hat, sind es nur 69.
+   Auf folio-hbz5 hatte ich diese beiden Module aber installiert. Auf folio-hbz2 auch.
 
-  Hole dir die Liste von Modulen, die jetzt für deinen Mandanten aktiviert sind (rein zur Information):
+   Hole dir die Liste von Modulen, die jetzt für deinen Mandanten aktiviert sind (rein zur Information):
 
-  curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules
+   curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules
 ...
 }, {
-  "id" : "okapi-6.2.5"
+  "id" : "okapi-7.0.1"
 } ]
 
-Das ist eine vollständige Plattform von "Bärlauch", sowie die Bärlauch-version (wir können dieselbe für Sonneblume nehmen) des Portals Okapi.
+Das ist eine vollständige Plattform von "Bärlauch", sowie die Sonnenblumen-Version des Portals Okapi.
 
 
 ### II.iii) Ziehe die Moduldeskriptorem aus der zentralen Registrierung
+
+  # das (alte) Kafka mal abschalten:
+  # cd /opt/kafka-zk
+  # docker-compose down
 
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '{ "urls": [ "https://folio-registry.dev.folio.org" ]  }' http://localhost:9130/_/proxy/pull/modules
 
 Im Okapi-Log sieht man dann etwas wie:
 
- INFO  ProxyContent         644040/proxy REQ 127.0.0.1:40600 supertenant POST /_/proxy/pull/modules okapi-6.1.3
- INFO  PullManager          Remote registry at https://folio-registry.dev.folio.org is version 5.0.111:52:31 [] [] [] []
- INFO  PullManager          pull smart
- INFO  PullManager          pull: 2208 MDs to insert
- INFO  ProxyContent         265532/proxy REQ 127.0.0.1:60014 supertenant POST /_/proxy/pull/modules okapi-6.1.3
+  13:00:00 INFO  ProxyContent         859422/proxy REQ 127.0.0.1:43518 supertenant POST /_/proxy/pull/modules okapi-7.0.1
+  13:00:03 INFO  PullManager          Remote registry at https://folio-registry.dev.folio.org is version 5.0.1
+  13:00:03 INFO  PullManager          pull smart
+  13:00:42 INFO  PullManager          pull: 4800 MDs to insert
+  13:00:48 INFO  ProxyContent         859422/proxy RES 200 47478780us okapi-7.0.1 /_/proxy/pull/modules
 ```
+  # das (alte) Kafka wieder hochfahren:
+  # cd /opt/kafka-zk
+  # docker-compose up -d
 
 ### II.iv) Konfiguriere die Umgebungsvariablen der Module
   Auf diesem Teil wird ein Systemadministrator vermutlich die meiste Zeit aufwenden.
@@ -273,10 +279,20 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
   # 1. Kopiere den Moduldeskriptor in eine Datei
   curl -w '\n' -D -  http://localhost:9130/_/proxy/modules/mod-bulk-operations-2.2.8 > mod-bulk-operations-2.2.8-module-descriptor.json
   # 2. Füge bei JAVA_OPTIONS etc. hinzu ... (s.o.)
+  # 2a. Falls Modul schon läuft: deaktivieren
+  # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '[ { "id" : "mod-authtoken-2.9.1", "action" : "disable" } ]' http://localhost:9130/_/proxy/tenants/diku/install?simulate=true
+  # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '[ { "id" : "mod-authtoken-2.9.1", "action" : "disable" } ]' http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false
+  # dies für alle Mandanten wiederholen
+  # 2b. Falls Modul schon läuft: Undeploy
+  # curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-authtoken-2.9.1
   # 3. Lösche den bisherigen Moduldeskriptor:
   curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-bulk-operations-2.2.8
   # 4. Sende den neuen Moduldeskriptor an /_/proxy/modules
    curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-bulk-operations-2.2.8-module-descriptor.json http://localhost:9130/_/proxy/modules
+  # 5. Falls Modul schon lief: Redeploy, Reaktivierung
+  # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '[{ "id": "mod-authtoken-2.9.1", "action": "enable"}]' http://localhost:9130/_/proxy/tenants/diku/install?simulate=true\&preRelease=false
+  # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '[{ "id": "mod-authtoken-2.9.1", "action": "enable"}]' http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadSample%3Dfalse%2CloadReference%3Dtrue
+  # dies für alle Mandanten wiederholen, jedoch mit deploy=false
  
 #### ii. Inkompatible Hazelcast-Versionen in mod-remote-storage-3.3.5
   Während des Upgrades der Module werden die beiden Versionen "Bärlauch" und "Sonnenblume" von mod-remote-storage parallel laufen. Das funktioniert aber nur, wenn sie verschiedenen "Hazelcast"-Trauben zugeordnet sind. Setze den Namen der Hazelcast-Traube für die Sonnenblumen-Version:
@@ -333,7 +349,7 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
   Setze MAX_SEARCH_BATCH_REQUEST_IDS_COUNT auf 20000 (es steht fälschlicherweise auf 20_000)
 
 #### vi. mod-agreements
-  Vergrößere den Speicher im Hochfahrdeskriptor von mod-agreements-7.2.2 auf 8 GB, wenn du FOLIO mit einer GoKB verbinden möchtest.
+  Vergrößere den Speicher im Hochfahrdeskriptor von mod-agreements-7.2.3 auf 8 GB, wenn du FOLIO mit einer GoKB verbinden möchtest.
 
   "dockerArgs" : {
       "HostConfig" : {
@@ -430,9 +446,15 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
    sudo su
    # Baue den Docker-Container, der Stripes und nginx enthalten wird:
    docker build -f docker/Dockerfile --build-arg OKAPI_URL=https://hbz-test.folio.hbz-nrw.de/okapi --build-arg TENANT_ID=diku -t stripes .
-   [+] Building 248.8s (24/24) FINISHED
- => WARN: FromAsCasing: 'as' and 'FROM' keywords' casing do not match (line 1)
-  Das läuft ca. 5 Minuten.
+   webpack 5.97.1 compiled with 3 warnings in 138699 ms
+   Done in 148.20s.
+   Step 21/21 : ENTRYPOINT ["/usr/bin/entrypoint.sh"]
+    ---> Running in 5f333c94b117
+   Removing intermediate container 5f333c94b117
+    ---> 5cbbabdccf11
+   Successfully built 5cbbabdccf11
+   Successfully tagged stripes:latest
+  Das läuft ca. 3 Minuten.
 
   Mache das gleiche für den 2. Mandanten:
    cd ~/platform-complete-bthvn
@@ -517,11 +539,12 @@ content-length: 112
 
   docker ps | grep mod- | wc
 
-  Es sollten 140 Module werden, bevor du weiter machst.
-    (ohne mod-dcb, mod-circulation-item und mod-reporting).
+  Es sollten 139 Module werden, bevor du weiter machst.
+    (ohne mod-dcb, mod-circulation-item und mod-reporting; ohne mod-mosaic).
     auf folio-hbz5 läuft zusätzlich mod-dcb Bärlauch.
+    auf folio-hbz2 142 Module. Es laufen zusätzlich mod-dcb-1.2.9 (Bärlauch), mod-circulation-item-1.1.0 (Bärlauch) und mod-reporting-1.2.1 (Bärlauch).
 
-  Diese Anzahl besteht aus 73 Werkstattmodulen der Version Bärlauch und 76 Werkstattmodulen der Version Sonnenblume.
+  Diese Anzahl besteht aus 73 Werkstattmodulen der Version Bärlauch und 75 Werkstattmodulen der Version Sonnenblume (ohne mod-mosaic).
   Es gibt Modulversionen, die in beiden Plattformversionen vorkommen:
     mod-eusage-reports:3.0.0
     mod-graphql:1.13.1
@@ -529,9 +552,9 @@ content-length: 112
   Neu in Sonnenblume:
     mod-linked-data:1.0.4
     mod-mosaic:1.0.0 (aber in CSP 4 wieder heraus genommen; es hat ein Nischendasein für Integration mit einem bestimmten Anbieter (EBSCO). Außerdem ist es erst ab Trillium offiziell Teil von FOLIO)
-    mod-marc-migrations:2.0.3
+    mod-marc-migrations:2.0.3 (nicht offiziell Teil der Plattform, aber von mir hinzugefügt)
 
-    mod-users-bl:7.9.3 (Bärlauch-Version) läuft 3x auf folio-hbz5!
+    ## mod-users-bl:7.9.3 (Bärlauch-Version) läuft 3x auf folio-hbz5!
 
   Wir schließen die Aktion ab, indem wir alle Module (Schaufenster und Werkstatt) mit einer einzigen Anfrage aktivieren, ohne weitere Module aufzustellen.
 
@@ -542,7 +565,8 @@ content-length: 112
 
   Wenn das fehlschlägt, finde den Grund dafür heraus, behebe die Fehlerursache und versuche es erneut, bis die Anfrage erfolgreich war.
 
-  (Quesnelia: Das dauerte 90 Sekunden pro Mandant.)
+  # Quesnelia: Das dauerte 90 Sekunden pro Mandant.
+  # folio-hbz2 (Sonnenblume): das dauerte 3-4 Minuten.
    
 
   # mod-marc-migrations-2.0.3 ist nicht hoch gekommen.
@@ -566,26 +590,27 @@ content-length: 112
 
   Alte Module, die noch laufen, aber nun nicht mehr benötigt werden, werden wir im "Aufräum"-Kapitel entfernen.
  
-       73 Sonnenblumen-Werkstattmodule wurden während "deploy=true" hochgefahren (70 ohne mod-dcb, mod-circluation-item und mod-reporting).
+       72 Sonnenblumen-Werkstattmodule wurden während "deploy=true" hochgefahren (69 ohne mod-dcb, mod-circluation-item und mod-reporting).
        73 Werkstattmodule liefen schon vorher (Bärlauch) (70 ohne mod-dcb, mod-circluation-item und mod-reporting).
-   Es sollte nun 146 (140) Module auf deinem Server geben. Versuche
+   Es sollte nun 145 (139) Module auf deinem Server geben. Versuche
 
   docker ps | grep "mod-" | wc
-    146 (140) sollen es sein.
+    145 (139) sollen es sein.
 
   Jetzt sind die Module der Sonnenblumen-Version für deinen Mandanten aktiviert:
 
   curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules | grep id | wc
   157 (154 ohne mod-dcb, mod-circulation-item und mod-reporting)
+  die Ziffer enthält eine Überschriftszeile
 
   Diese Zahl ist die Summe folgender Anzahlen:
 
- Sonnenblume CSP-3 Veröffentlichung (siehe ~/folio-install/modules.quesnelia.csv):
-         68 Schaufenstermodule
+ Sonnenblume CSP-4 Veröffentlichung
+         68 Schaufenstermodule (mit folio_ldp)
        + 12 Kantenmodule
-       + 76 Werkstattmodule
+       + 72 Werkstattmodule (ohne mod-dcb, mod-circulation-item und mod-reporting; ohne mod-mosaic, mit mod-marc-migrations)
        +  1 Okapi-Modul (Portal) (6.1.3) 
- Summe: 157
+ Summe: 153
 
   Das sind alle Module der Veröffentlichung R1-2025 "Sonnenblume".
 
@@ -621,7 +646,7 @@ content-length: 112
 
   - Sehen Sie die Sonnenblumen-Module in Einstellungen - Installationsdetails ?
 
-  - Sehen Sie die richtige Okapi-Version, 6.2.5 ? 
+  - Sehen Sie die richtige Okapi-Version, 7.0.1 ? 
 
   - Sieht auch sonst alles gut aus ?
 
@@ -636,7 +661,8 @@ content-length: 112
 ```
   docker system prune -a
 ```
-  Total reclaimed space: 15.72GB
+  Total reclaimed space: 15.72GB (folio-hbz5)
+                         13.43GB (folio-hbz2)
 
   Entferne alle ungenutzen Behältnisse: Lösche alle Module, die nicht Teil des Veröffentlichungspaketes "Sonnenblume" sind, aus der Entdeckungsschicht des Portals.
   Entferne alte Modulversionen auf dieser Weise:
@@ -647,16 +673,18 @@ curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-audit-
 curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-users-bl-7.9.3
 ```
 
-  Das sind 68 Module von "Bärlach" (alle 73 Bärlauch-Module bis auf die 3, die auch in Sonnenblume vorkommen. Außerdem nicht: mod-circulation-item und mod-reporting (Bärlauch-Versionen). Jedoch mit mod-dcb-1.2.8 (Bärlauch), welches ich in Bärlauch installiert hatte.)
-
+  Das sind 70 Module von "Bärlach" (alle 73 Bärlauch-Module bis auf die 3, die auch in Sonnenblume vorkommen.)
   Außerdem auf folio-hb5 noch 5 Kantenmodule, die in niedrigerer Version noch aufgestellt sind:
      Finde sie heraus mit:
      docker ps | grep edge- | sort -k 2
+  Auf folio-hbz2 sind es dieselben Kantenmodule.
 
    Ich habe dieses Skript erzeugt und ausgeführt. Es enthält nur (und alle) Bärlauch-Instanzen, die nicht auch Teil von Sonnenblume sind, sowie die überzähligen Kantenmodule.
-   Alle 73 jetzt noch zu löschenden Module (inkl. Kantenmodule) stehen in diesem Skript:
+   Alle 75 jetzt noch zu löschenden Module (inkl. Kantenmodule) stehen in diesem Skript:
    cd ~/folio-install
    ./dockerps.todelete.desBärlauch.sh
+
+   folio-hbz2: mod-circulation-item-1.1.0 lässt sich nicht aus dem Discovery entfernen. Ich halte den Container an: docker stop 7313f4b3c826
 
    # mod-graphql-1.12.1 auf folio-hbz4 und folio-hbz3 noch zusätzlich entfernt:
   curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-graphql-1.12.1
@@ -668,10 +696,10 @@ curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-users-
    (Jetzt könnte man mod-reporting und folio_ldp dazu installieren.)
 
 ### Ergebnis
-  Für "Sonnenblumen"-Auskopplung, CSP-3
-  76 Werkstattmodule, "mod-\*" enthält die Liste install.json (73 ohne mod-dcb, mod-circulation-item und mod-reporting).
-  Diese 73 Werkstattmodule sind jetzt für deinen Mandanten aktiviert.
-  73 Behältnisse für diese Module laufen in deinem Hafenarbeiter-System.
+  Für "Sonnenblumen"-Auskopplung, CSP-4
+  75 Werkstattmodule, "mod-\*" enthält die Liste install.json (72 ohne mod-dcb, mod-circulation-item und mod-reporting).
+  Diese 72 Werkstattmodule sind jetzt für deinen Mandanten aktiviert.
+  72 Behältnisse für diese Module laufen in deinem Hafenarbeiter-System.
 
   Hole dir schließlich noch einmal eine Liste der aufgestellten Werkstattmodule:
   
@@ -679,13 +707,15 @@ curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-users-
   curl -w '\n' -D - http://localhost:9130/_/discovery/modules | grep srvcId | grep mod- | wc
  73
   ```
+  mod-circuation-item ist drin und läßt sich nicht entfernen.
   
   Vergleiche diese Anzahl mit der deiner laufenden Hafenarbeiter-Behältnisse:
   
   ```
   docker ps | grep "mod-" | wc
-    73
+    72
   ```
+  (73 mit mod-circulation-item)
 
   Führe eine Gesundheitsprüfung durch:
   ```
@@ -699,38 +729,38 @@ curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-users-
 ## VII. Nach dem Upgrade
 
 ### VII.i) Aus den Veröffentlichungshinweisen für "Sonneblume":
-After migration is executed, the Authority re-index must be executed according to instructions: https://github.com/folio-org/mod-search/tree/MSEARCH-966?tab=readme-ov-file#recreating-elasticsearch-index
-It’s crucial that during the MARC migration process, there is no interaction with the environment.
+  Nachdem die Migration ausgeführt wurde, muss der Index für Vollmachten (authorities) neu gebaut werden gemäß diesen Anweisungen: https://github.com/folio-org/mod-search/tree/MSEARCH-966?tab=readme-ov-file#recreating-elasticsearch-index
+  Es ist wichtig, dass während der MARC-Migration keine Wechselwirkung mit der Umgebung stattfindet.
 
-  Hole ein neues Zeichen und reindexiere Authorities:
+  Hole ein neues Zeichen und reindexiere Vollmachten:
      curl -s -S -D - -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -H "Accept: application/json" -d '{ "tenant" : "diku", "username" : "diku_admin", "password" : "admin" }' http://localhost:9130/authn/login-with-expiry
   Das TOKEN ist der Teil zwischen "Set-Cookie: folioAccessToken=" und dem ersten Semikolon;
       export TOKEN=...
-       curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "recreateIndex": true, "resourceName": "authority", "indexSettings": { "numberOfShards": 2, "numberOfReplicas": 4, "refreshInterval": 1 } }' http://localhost:9130/search/index/inventory/reindex
+      curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "recreateIndex": true, "resourceName": "authority", "indexSettings": { "numberOfShards": 2, "numberOfReplicas": 4, "refreshInterval": 1 } }' http://localhost:9130/search/index/inventory/reindex
        HTTP/1.1 200 OK
 Content-Type: application/json
-Date: Tue, 23 Dec 2025 18:55:57 GMT
+Date: Wed, 07 Jan 2026 18:43:40 GMT
 transfer-encoding: chunked
 
-{"id":"a9ba2d5b-6f6f-4354-9784-342ca0de050b","jobStatus":"In progress","submittedDate":"2025-12-23T18:55:56.934865609Z"}
+{"id":"efea2035-ba14-4234-99eb-eb86adbed60e","jobStatus":"In progress","submittedDate":"2026-01-07T18:43:40.522632801Z"}
 
        # Updating index settings
        curl -w '\n' -D - -X PUT -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "resourceName": "authority", "indexSettings": { "numberOfReplicas": 4, "refreshInterval": 60 } }' http://localhost:9130/search/index/settings
        HTTP/1.1 200 OK
 Content-Type: application/json
-Date: Tue, 23 Dec 2025 18:58:33 GMT
+Date: Wed, 07 Jan 2026 18:46:57 GMT
 transfer-encoding: chunked
 
 {"status":"success"}
  
   # Monitoring authority reindex process
-       curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" http://localhost:9130/authority-storage/reindex/a9ba2d5b-6f6f-4354-9784-342ca0de050b
+       curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" http://localhost:9130/authority-storage/reindex/efea2035-ba14-4234-99eb-eb86adbed60e
        HTTP/1.1 200 OK
 Content-Type: application/json
-Date: Tue, 23 Dec 2025 19:01:01 GMT
+Date: Wed, 07 Jan 2026 18:47:45 GMT
 transfer-encoding: chunked
 
-{"id":"a9ba2d5b-6f6f-4354-9784-342ca0de050b","published":0,"jobStatus":"Ids published","resourceName":"Authority","submittedDate":"2025-12-23T18:55:56.934866Z"}
+{"id":"efea2035-ba14-4234-99eb-eb86adbed60e","published":0,"jobStatus":"Ids published","resourceName":"Authority","submittedDate":"2026-01-07T18:43:40.522633Z"}
 
 (von Bärlauch)
 #### VII.ii) mod-search
@@ -739,10 +769,10 @@ transfer-encoding: chunked
   curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "recreateIndex": true, "resourceName": "location", "indexSettings": { "numberOfShards": 2, "numberOfReplicas": 4, "refreshInterval": 1 } }' http://localhost:9130/search/index/inventory/reindex
   HTTP/1.1 200 OK
 Content-Type: application/json
-Date: Tue, 23 Dec 2025 19:03:20 GMT
+Date: Wed, 07 Jan 2026 18:48:34 GMT
 transfer-encoding: chunked
 
-{"id":"e9af8065-3144-419d-ae13-9049f1c843e2","jobStatus":"Completed","submittedDate":"Tue Dec 23 19:03:18 GMT 2025"}
+{"id":"ebf30fba-d705-40b1-b2e8-ea9a75fece46","jobStatus":"Completed","submittedDate":"Wed Jan 07 18:48:33 GMT 2026"}
 
 ### VII.iii) Neuaufbau des "Elasticsearch"-Indexes "Inventar"
 
@@ -754,28 +784,20 @@ transfer-encoding: chunked
   Die Inventar-Reindexierung anstoßen
   ===================================
   Sonnenblume:
-  Instance re-index is required to be executed according to instructions: https://github.com/folio-org/mod-search/tree/v5.0.7?tab=readme-ov-file#indexing-of-instance-records
+  Die Reindexierung der Instanzen muss den folgenden Anweisungen gemäß ausgeführt werden: https://github.com/folio-org/mod-search/tree/v5.0.7?tab=readme-ov-file#indexing-of-instance-records
 
    # 1. Schritt: Datenaggregation/Merge
-       curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "indexSettings": { "numberOfShards": 2, "numberOfReplicas": 4, "refreshInterval": 1 } }' http://localhost:9130/search/index/instance-records/reindex/full
-HTTP/1.1 200 OK
-Date: Tue, 23 Dec 2025 19:10:56 GMT
-transfer-encoding: chunked
+   # dieser Schritt muss nur einmalig gemacht werden, und wir haben ihn schon bei der Migration von Quesnelia nach Ramsons gemacht.
+   # curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "indexSettings": { "numberOfShards": 2, "numberOfReplicas": 4, "refreshInterval": 1 } }' http://localhost:9130/search/index/instance-records/reindex/full
+   # HTTP/1.1 200 OK
+   # Date: Tue, 23 Dec 2025 19:10:56 GMT
+   # transfer-encoding: chunked
 
-     # mglw. hätte man nur das hier machen müssen ("Upload"), aber das geht jetzt nicht mehr:
-     # 2. Schritt: Upload
-       curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{"entityTypes": ["instance", "subject", "contributor", "classification", "call-number"]}' http://localhost:9130/search/index/instance-records/reindex/upload
-       HTTP/1.1 400 Bad Request
-Content-Type: application/json
-Date: Tue, 23 Dec 2025 19:12:10 GMT
-Connection: close
+    # 2. Schritt: Upload
+     curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{"entityTypes": ["instance", "subject", "contributor", "classification", "call-number"]}' http://localhost:9130/search/index/instance-records/reindex/upload
+       HTTP/1.1 200 OK
+Date: Wed, 07 Jan 2026 18:53:06 GMT
 transfer-encoding: chunked
-
-{"errors":[{"message":"Reindex Upload in Progress","type":"RequestValidationException","code":"validation_error","parameters":[{"key":"entityType","value":"instance"}]}],"total_records":1}
-      ab Ransoms: Wenn das einmal gemacht wurde ("1. Schritt: Datenaggregation/Merge", "2. Schritt: Upload") muss danach nur noch der 2. Schritt aufgerufen werden, das geschieht mit dem Endpoint /upload. Siehe hier: https://github.com/folio-org/mod-search?tab=readme-ov-file#indexing-of-instance-records
-{
-  "entityTypes": ["instance", "subject", "contributor", "classification", "call-number"]
-}
 
   # Um den asynchronen Prozess zu überwachen können wir diesen Endpunkt ausführen:
        curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" http://localhost:9130/search/index/instance-records/reindex/status
@@ -785,9 +807,9 @@ transfer-encoding: chunked
   INSTANCE, HOLDINGS, ITEM, SUBJECT, CONTRIBUTOR, CLASSIFICATION, CALL_NUMBER
   Mögliche Status: MERGE_COMPLETED, UPLOAD_IN_PROGRESS - UPLOAD_COMPLETED
   "When entityType has value of item or holding then we have status details of Merge step and when entityType has value of subject, contributor or classification then we have status details of Upload step. Only for entity type of instance we can have statuses of both Merge and Upload steps."
+  INSTANCE geht auf UPLOAD_COMPLETED.
 
   Das okapi.log verfolgen!
-  mod-user-bl ist wieder abgestürzt => mit docker start neu gestartet.
   Im Browser sieht man jetzt, dass sich die Anzahl der Katalogeinträge langsam wieder aufbaut (Schauen bei "Quelle").
   Instanten stehen nach 34 Minuten auf "UPLOAD_COMPLETED" und sind von dann an vollständig im Katalog auffindbar.
   224.829 Titeldatensätze am 23.12.2025 auf hbz-test.
@@ -804,23 +826,25 @@ transfer-encoding: chunked
   17:13:04 [329919/proxy;726590/tenant] [wdr] [] [mod-search] INFO  ResourceService      Records indexed to elasticsearch [indexRequests: 90, removeRequests: 0]
   mod-inventory-storage ebenfalls.
 
-  # hier weiter
   Wiederhole den Reindexierungsprozess für andere Mandanten, die du vielleicht auf deinem Server beherbergst, und die auch zur Sonnenblume migriert sind.
 
 ### VII.iii) Berechtigungen aktualisieren
   Aktualisiere die Berechtigungen, so wie hier beschrieben: [Aktualisiere Berechtigungen](https://folio-org.atlassian.net/wiki/spaces/REL/pages/105775925/Quesnelia+R1+2024+Permissions+Updates).
+  - für Sonnenblume wird das nur für Eureka beschrieben, was aber etwas völlig anderes ist.
 
 ### VII.iv) Manuelle tests
 - Melde dich an der Oberfläche des Systems an.
 - Lösche den Browser-Cache (das ist wichtig, weil man sonst noch die alten Vordermodule sieht)
 - Gehe zur Seite "Systemeinstellungen"
     - es sollten keine inkompatiblen Abhängigkeiten zu sehen sein
-    - gucke, ob "Sonnenblume CSP-3" auf der Seite angezeigt wird.
+    - gucke, ob "Sonnenblume CSP-4" auf der Seite angezeigt wird.
 - Überprüfe, ob man das Ausleihprotokoll herunterladen kann (Dadurch wird überprüft, ob mod-data-export-worker läuft).
      Test-User auf folio-hbz4 : Personen-Barcode 1234 => geht . Ausleihprotokoll kommt in minio an und wird im Browser zur Darstellung angeboten.
         - im 2. Versuch kommt das Ausleihprotokoll im minio an (erst nach einer neuen Ausleihe)
+                   folio-hbz2: Personen-Barcode 12345 => in minio kommt es an.
 - Überpfüfe, ob das System E-Mails versenden kann
    - Mache eine Ausleihe für einen Test-Nutzer: 1234 auf folio-hbz4, Rückgabe von Item 4321. => kommt email "erfolgreiche Ausleihe" von noreply@folio-hbz4 .
+                                   Test-Nutzer: 12345 auf folio-hbz2, Item Barcode 9876 => z.Zt. Stress mit mod-quick-marc; "Error deserializing VALUE for partition sunflower.diku.inventory.item-21 at offset 0. If needed, please seek past the record to continue consumption." => Gateway Timeout; später noch einmal probieren
      ausgeliehen folio-hbz4: Item 00000169 => es kommt eine Email "erfolgreiche Ausleihe - WDR (Testsystem)"
    - Email "Reset your Folio account" für User 2345 erhalten (geschenkt)
       Fertig folio-hbz4 24.01.2025, 18:20 Uhr
