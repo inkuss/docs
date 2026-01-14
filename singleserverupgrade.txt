@@ -44,8 +44,7 @@ Prüfe, ob alle Dienste nach dem Reboot neu gestartet wurden: <em>Okapi, postgre
 Dies sind die offiziellen [Sonnenblume wichtige Upgrade-Erwägungen](https://folio-org.atlassian.net/wiki/spaces/REL/pages/399081687/Sunflower+R1+2025+Important+upgrade+considerations)
 Mach das hier vor dem Upgrade:
 
-  Source: FOLIO 80
-          MARC   5
+  folio-demo: im Inventory ist: Source: FOLIO 80, MARC 5.
 ### I.ii) Aus den offiziellen Sonnenblumen Veröffentlichungshinweisen:
 #### 1.) mod-users-bl
   (Okapi) curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EUREKA_LOGIN_PERMS\",\"value\":\"false\"}" http://localhost:9130/_/env
@@ -62,7 +61,7 @@ Mach das hier vor dem Upgrade:
  Hole die neue Version von "platform-complete", wechsele in das Verzeichnis:
   cd platform-complete
   git fetch
-  # folio-hbz2: war R2-2024-csp-1
+  # folio-hbz2, folio-hbz4: war R2-2024-csp-1
 
 Es gibt einen Zweig R1-2025-okapi-csp-3. Den installieren wir.
 Leihe diesen Zweig aus.
@@ -128,7 +127,7 @@ diff /tmp/install.json install.json
 
 D.h.  mod-marc-migrations, mod-mosaic und folio_mosaic-settings (alle neu in Sonnenblume) sind wieder herausgeflogen. Außerdem habe 8 Module ein Versionsupdate bekommen.
 
-Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu:
+Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu (editiere install.json):
 }, {
   "id" : "folio_serials-management-2.0.4",
   "action" : "enable"
@@ -150,8 +149,9 @@ Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu:
   Java JDK Version von 17 auf 21 hoch ziehen, die neueren Okapi-Versionen sind sonst nicht kompilierbar
   *****************************************************************************************************
   Neue Version von javac auf Ubuntu 22 installieren
-  # Niko hat auf folio-hbz2 das "universe" Ubuntu Repo installiert
-  sudo apt update
+  # Im SUSE-Manager über (Server) - Software - Software Kanäle - Kindkanäle
+    diesen Kanal anklicken: ubuntu-2204-amd64-universe for amd64  ; und die anderen 3 "universe"-Channels müssen auch angeklickt werden. Dann "weiter" und bestätigen.
+  sudo apt update ; sudo apt upgrade
   sudo apt install openjdk-21-jdk
   dann noch mit 
    sudo update-alternatives --config javac
@@ -167,15 +167,26 @@ Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu:
   in /usr/folio/.profile editieren: 
     export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64/
   dann noch einmal neu einloggen
+  # Ändere JVM-Version auch in /root/.profile :
+     export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+  als root neu einloggen
 
   hier muss auch JDK 21 erscheinen:
   echo $JAVA_HOME
   mvn --version
+    Error: Could not find or load main class org.codehaus.plexus.classworlds.launcher.Launcher
+    Caused by: java.lang.ClassNotFoundException: org.codehaus.plexus.classworlds.launcher.Launcher
 
-  # Hole okapi-6.2.5.zip von https://github.com/folio-org/okapi/tree/v6.2.5 und kopiere es nach /usr/folio
-  #   cd /usr/folio
-  #   unzip okapi-6.2.5.zip
-  #   cd okapi-6.2.5
+   Re-Installiere Maven aus dem tar-File
+   Deinstalliere das aus dem Repo installierte Maven (Binary ist ebenfalls von November 2019, Version 3.6.3-5):
+     apt remove maven
+   Hole /usr/folio/apache-maven-3.6.3-bin.tar von folio-demo
+   tar -xf apache-maven-3.6.3-bin.tar
+   cd /usr/local/bin
+   ln -s /usr/folio/apache-maven-3.6.3/bin/mvn
+   # einmal aus- und wieder einloggen
+   mvn --version
+     Apache Maven 3.6.3
 
   cd /usr/folio/okapi
   git fetch
@@ -185,21 +196,24 @@ Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu:
 [INFO] ------------------------------------------------------------------------
 [INFO] Reactor Summary for okapi 7.0.1:
 [INFO]
-[INFO] okapi .............................................. SUCCESS [  8.313 s]
-[INFO] okapi-testing ...................................... SUCCESS [ 10.128 s]
-[INFO] okapi-common ....................................... SUCCESS [01:19 min]
-[INFO] okapi-test-module .................................. SUCCESS [  4.865 s]
-[INFO] okapi-test-auth-module ............................. SUCCESS [  5.894 s]
-[INFO] okapi-test-header-module ........................... SUCCESS [  3.516 s]
-[INFO] okapi-core ......................................... SUCCESS [01:02 min]
+[INFO] okapi .............................................. SUCCESS [ 12.618 s]
+[INFO] okapi-testing ...................................... SUCCESS [ 10.720 s]
+[INFO] okapi-common ....................................... SUCCESS [01:20 min]
+[INFO] okapi-test-module .................................. SUCCESS [  4.991 s]
+[INFO] okapi-test-auth-module ............................. SUCCESS [  6.097 s]
+[INFO] okapi-test-header-module ........................... SUCCESS [  3.883 s]
+[INFO] okapi-core ......................................... SUCCESS [01:00 min]
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  03:05 min
-[INFO] Finished at: 2026-01-07T11:55:23+01:00
+[INFO] Total time:  03:09 min
+[INFO] Finished at: 2026-01-14T19:44:49+01:00
 [INFO] ------------------------------------------------------------------------
 
  Neustart Okapi
+   in /etc/folio/okapi/okapi.sh die Zeile "source ~/.profile" herausnehmen (sonst wird von Okapi die falsche [alte] JVM-Version gezogen und es startet nicht an).
+   in /etc/folio/okapi/log4j2.properties das Layout Muster ändern (sonst kommen beim Start von Okapi Fehler bezüglich des Loggers):
+     appender.f.layout.pattern = %d{HH:mm:ss} [${map:requestid}] [${map:tenantid}] [${map:userid}] [${map:moduleid}] %-5p %-20.20C{1} %m%n
    sudo systemctl restart okapi
 
  Verfolge /var/log/folio/okapi/okapi.log . 
@@ -208,10 +222,16 @@ Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu:
 
  docker ps | grep "mod-" | wc
    73
+  - auf folio-hbz4 zusätzlich noch im Discovery = veraltete Versionen, die hoch kommen, aber dann nach spätestens 5 Minuten wieder abstürzen (Status Exited): 
+    mod-service-interaction:1.1.0
+    mod-licenses:4.2.1
+    mod-kb-ebsco-java:3.11.1
+    mod-remote-storage:1.6.0
 
  Diese Zahl bezieht sich auf eine Vollinstallation von "Bärlauch".
-   wenn man mod-dcb und mod-circulation-item nicht installiert hat, sind es nur 69.
+   wenn man mod-dcb und mod-circulation-item nicht installiert hat, sind es nur weniger.
    Auf folio-hbz5 hatte ich diese beiden Module aber installiert. Auf folio-hbz2 auch.
+   Auf folio-hbz4 ist mod-dcb nicht installiert, dafür läuft mod-remote-store zweimal, in zwei unterschiedlichen Versionen (1.6.0 und 3.3.5).
 
    Hole dir die Liste von Modulen, die jetzt für deinen Mandanten aktiviert sind (rein zur Information):
 
@@ -223,7 +243,7 @@ Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu:
 
 Das ist eine vollständige Plattform von "Bärlauch", sowie die Sonnenblumen-Version des Portals Okapi.
 
-
+# hier weiter
 ### II.iii) Ziehe die Moduldeskriptorem aus der zentralen Registrierung
 
   # das (alte) Kafka mal abschalten:
@@ -678,6 +698,12 @@ curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-users-
      Finde sie heraus mit:
      docker ps | grep edge- | sort -k 2
   Auf folio-hbz2 sind es dieselben Kantenmodule.
+
+   Auf folio-hbz4 müssen zusätzlich noch diese noch älteren Module entfernt werden:
+      mod-service-interaction:1.1.0
+      mod-licenses:4.2.1
+      mod-kb-ebsco-java:3.11.1
+      mod-remote-storage:1.6.0
 
    Ich habe dieses Skript erzeugt und ausgeführt. Es enthält nur (und alle) Bärlauch-Instanzen, die nicht auch Teil von Sonnenblume sind, sowie die überzähligen Kantenmodule.
    Alle 75 jetzt noch zu löschenden Module (inkl. Kantenmodule) stehen in diesem Skript:
