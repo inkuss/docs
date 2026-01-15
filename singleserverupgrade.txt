@@ -263,6 +263,7 @@ Im Okapi-Log sieht man dann etwas wie:
   # cd /opt/kafka-zk
   # docker-compose up -d
 
+
 ### II.iv) Konfiguriere die Umgebungsvariablen der Module
   Auf diesem Teil wird ein Systemadministrator vermutlich die meiste Zeit aufwenden.
 
@@ -507,18 +508,24 @@ Successfully tagged stripes:latest
   Das läuft ca. 5 Minuten.
 
 
-  # hier weiter
   14.1.2026 Man kann sich nicht auf wdr-test einloggen:
   12:10:26 [821625/bl-users] [wdr] [] [mod-authtoken-2.16.2 mod-users-bl-7.9.3] INFO  ?                    821625/bl-users REQ 193.30.112.122:52022 wdr POST /bl-users/login-with-expiry mod-authtoken-2.16.2 mod-users-bl-7.9.3
   12:10:26 [821625/bl-users] [wdr] [] [okapi] INFO  ?                    821625/bl-users RES 404 - okapi No running module instance found for mod-users-bl-7.9.3
   12:10:26 [${map:requestid}] [${map:tenantid}] [${map:userid}] [${map:moduleid}] ERROR ?                    HTTP response POST /bl-users/login-with-expiry code=404 msg=No running module instance found for mod-users-bl-7.9.3
   Martina: Am 8.1.2026 ging das noch.
+  Stattdessen müsste so etwas kommen:
+  14:04:14 [] [] [] [] INFO  ?                    750018/bl-users RES 202 611us mod-authtoken-2.17.0 http://10.9.2.86:19011/bl-users/login-with-expiry?expandPermissions=true&fullPermissions=true
+
+  im Okapi Service Skript geändert:
+    Exec => /usr/share/folio/okapi/bin/okapi.sh  (war: /etc/folio/okapi/okapi.sh)
+    Die Container fahren gar nicht herunter, wenn man Okapi herunter fährt.
 
 ## IV. Stelle einen neuen FOLIO-Arbeitsbereich auf und aktiviere anschließend alle Module dieser neuen Plattform für Deinen Mandanten.
 
 Benutzer sollten jetzt nicht mehr mit dem System arbeiten, denn nachdem ein neues Backend aufgestellt wurde, wird das Frontend nicht mehr damit kompatibel sein und muss ebenfalls neu aufgestellt werden.
   Das System (erneut, nach dem Postgres-Upgrade) vom Netz nehmen.
 
+  # hier weiter
   Jetzt lasse einen Schnappschuss deines Systems machen, der ggfs. zurück gespielt werden kann, falls das folgende Vorgehen fehlschlägt.
 
   Gucken, ob alle Dienste nach dem Schnappschuss wieder angestartet sind.
