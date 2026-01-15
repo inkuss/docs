@@ -222,16 +222,16 @@ Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu (editiere install
 
  docker ps | grep "mod-" | wc
    73
+ Diese Zahl bezieht sich auf eine Vollinstallation von "Bärlauch".
+   wenn man mod-dcb und mod-circulation-item nicht installiert hat, sind es nur weniger.
+   Auf folio-hbz5 hatte ich diese beiden Module aber installiert. Auf folio-hbz2 auch.
+   Auf folio-hbz4 ist mod-dcb nicht installiert.
+
   - auf folio-hbz4 zusätzlich noch im Discovery = veraltete Versionen, die hoch kommen, aber dann nach spätestens 5 Minuten wieder abstürzen (Status Exited): 
     mod-service-interaction:1.1.0
     mod-licenses:4.2.1
     mod-kb-ebsco-java:3.11.1
     mod-remote-storage:1.6.0
-
- Diese Zahl bezieht sich auf eine Vollinstallation von "Bärlauch".
-   wenn man mod-dcb und mod-circulation-item nicht installiert hat, sind es nur weniger.
-   Auf folio-hbz5 hatte ich diese beiden Module aber installiert. Auf folio-hbz2 auch.
-   Auf folio-hbz4 ist mod-dcb nicht installiert, dafür läuft mod-remote-store zweimal, in zwei unterschiedlichen Versionen (1.6.0 und 3.3.5).
 
    Hole dir die Liste von Modulen, die jetzt für deinen Mandanten aktiviert sind (rein zur Information):
 
@@ -243,7 +243,6 @@ Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu (editiere install
 
 Das ist eine vollständige Plattform von "Bärlauch", sowie die Sonnenblumen-Version des Portals Okapi.
 
-# hier weiter
 ### II.iii) Ziehe die Moduldeskriptorem aus der zentralen Registrierung
 
   # das (alte) Kafka mal abschalten:
@@ -254,11 +253,11 @@ Das ist eine vollständige Plattform von "Bärlauch", sowie die Sonnenblumen-Ver
 
 Im Okapi-Log sieht man dann etwas wie:
 
-  13:00:00 INFO  ProxyContent         859422/proxy REQ 127.0.0.1:43518 supertenant POST /_/proxy/pull/modules okapi-7.0.1
-  13:00:03 INFO  PullManager          Remote registry at https://folio-registry.dev.folio.org is version 5.0.1
-  13:00:03 INFO  PullManager          pull smart
-  13:00:42 INFO  PullManager          pull: 4800 MDs to insert
-  13:00:48 INFO  ProxyContent         859422/proxy RES 200 47478780us okapi-7.0.1 /_/proxy/pull/modules
+  11:22:43 [811682/proxy] [supertenant] [] [okapi-7.0.1] INFO  ?                    811682/proxy REQ 127.0.0.1:38876 supertenant POST /_/proxy/pull/modules okapi-7.0.1
+  11:22:47 [${map:requestid}] [${map:tenantid}] [${map:userid}] [${map:moduleid}] INFO  ?                    Remote registry at https://folio-registry.dev.folio.org is version 5.0.1
+  11:22:47 [${map:requestid}] [${map:tenantid}] [${map:userid}] [${map:moduleid}] INFO  ?                    pull smart
+  11:22:56 [${map:requestid}] [${map:tenantid}] [${map:userid}] [${map:moduleid}] INFO  ?                    pull: 4916 MDs to insert
+  11:23:05 [811682/proxy] [supertenant] [] [okapi-7.0.1] INFO  ?                    811682/proxy RES 200 21722401us okapi-7.0.1 /_/proxy/pull/modules
 ```
   # das (alte) Kafka wieder hochfahren:
   # cd /opt/kafka-zk
@@ -314,7 +313,7 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
   # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '[{ "id": "mod-authtoken-2.9.1", "action": "enable"}]' http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadSample%3Dfalse%2CloadReference%3Dtrue
   # dies für alle Mandanten wiederholen, jedoch mit deploy=false
  
-#### ii. Inkompatible Hazelcast-Versionen in mod-remote-storage-3.3.5
+#### ii. Inkompatible Hazelcast-Versionen in mod-remote-storage
   Während des Upgrades der Module werden die beiden Versionen "Bärlauch" und "Sonnenblume" von mod-remote-storage parallel laufen. Das funktioniert aber nur, wenn sie verschiedenen "Hazelcast"-Trauben zugeordnet sind. Setze den Namen der Hazelcast-Traube für die Sonnenblumen-Version:
 
   # Konfiguriere mod-remote-storage
@@ -422,7 +421,6 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
 
 
 #### viii. Einstellungen für die Lists-App
-   mod-lists-3.1.5
    Setze die Umgebungsvariable:
   curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"LIST_APP_S3_BUCKET\",\"value\":\"hbz-test\"}" http://localhost:9130/_/env
 
@@ -466,15 +464,20 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
    sudo su
    # Baue den Docker-Container, der Stripes und nginx enthalten wird:
    docker build -f docker/Dockerfile --build-arg OKAPI_URL=https://hbz-test.folio.hbz-nrw.de/okapi --build-arg TENANT_ID=diku -t stripes .
-   webpack 5.97.1 compiled with 3 warnings in 138699 ms
-   Done in 148.20s.
-   Step 21/21 : ENTRYPOINT ["/usr/bin/entrypoint.sh"]
-    ---> Running in 5f333c94b117
-   Removing intermediate container 5f333c94b117
-    ---> 5cbbabdccf11
-   Successfully built 5cbbabdccf11
-   Successfully tagged stripes:latest
-  Das läuft ca. 3 Minuten.
+   webpack 5.97.1 compiled with 3 warnings in 139054 ms
+Done in 149.85s.
+Removing intermediate container ce623ec87331
+ ---> 0622f26e9fda
+Step 16/23 : FROM nginx:stable-alpine
+stable-alpine: Pulling from library/nginx
+1074353eec0d: Pull complete
+...
+Step 23/23 : ENTRYPOINT ["/usr/bin/entrypoint.sh"]
+ ---> Running in 8b48fa75adac
+Removing intermediate container 8b48fa75adac
+ ---> 9cd62c0270ec
+Successfully built 9cd62c0270ec
+Successfully tagged stripes:latest
 
   Mache das gleiche für den 2. Mandanten:
    cd ~/platform-complete-bthvn
@@ -503,6 +506,13 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
  => WARN: FromAsCasing: 'as' and 'FROM' keywords' casing do not match (line 1)
   Das läuft ca. 5 Minuten.
 
+
+  # hier weiter
+  14.1.2026 Man kann sich nicht auf wdr-test einloggen:
+  12:10:26 [821625/bl-users] [wdr] [] [mod-authtoken-2.16.2 mod-users-bl-7.9.3] INFO  ?                    821625/bl-users REQ 193.30.112.122:52022 wdr POST /bl-users/login-with-expiry mod-authtoken-2.16.2 mod-users-bl-7.9.3
+  12:10:26 [821625/bl-users] [wdr] [] [okapi] INFO  ?                    821625/bl-users RES 404 - okapi No running module instance found for mod-users-bl-7.9.3
+  12:10:26 [${map:requestid}] [${map:tenantid}] [${map:userid}] [${map:moduleid}] ERROR ?                    HTTP response POST /bl-users/login-with-expiry code=404 msg=No running module instance found for mod-users-bl-7.9.3
+  Martina: Am 8.1.2026 ging das noch.
 
 ## IV. Stelle einen neuen FOLIO-Arbeitsbereich auf und aktiviere anschließend alle Module dieser neuen Plattform für Deinen Mandanten.
 
@@ -760,6 +770,7 @@ curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-users-
 
   Hole ein neues Zeichen und reindexiere Vollmachten:
      curl -s -S -D - -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -H "Accept: application/json" -d '{ "tenant" : "diku", "username" : "diku_admin", "password" : "admin" }' http://localhost:9130/authn/login-with-expiry
+HTTP/1.1 201 Created
   Das TOKEN ist der Teil zwischen "Set-Cookie: folioAccessToken=" und dem ersten Semikolon;
       export TOKEN=...
       curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" -d '{ "recreateIndex": true, "resourceName": "authority", "indexSettings": { "numberOfShards": 2, "numberOfReplicas": 4, "refreshInterval": 1 } }' http://localhost:9130/search/index/inventory/reindex
