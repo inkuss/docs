@@ -19,14 +19,14 @@ Dies ist eine Dokumentation für einen System-***Upgrade***, keine Neuinstallati
 | **Systemtyp**                       | **Version für diese Dokumentation**        |
 |-------------------------------------|--------------------------------------------|
 | Betriebssystem                      | Ubuntu 22.04.2 LTS 64-bits                 |
-| FOLIO-Version,von der migriert wird | Quesnelia CSP#9 (R1-2024-CSP-9)            |
+| FOLIO-Version,von der migriert wird | Ramsons (R2-2024)                          |
 
 
 **Hardwarevoraussetzungen**
 
 | **Anforderung** | **FOLIO Platform Complete** |
 |-----------------|-----------------------------|
-| RAM             | 40GB                        |
+| RAM             | 64GB                        |
 | CPU             | 8                           |
 | HD              | 350 GB SSD                  |
 
@@ -34,7 +34,7 @@ Dies ist eine Dokumentation für einen System-***Upgrade***, keine Neuinstallati
 
 ### I.i) Ubuntu Upgrade
 Erst Ubuntu Updates & Upgrades machen. Das auch auf dem Datenbankserver machen.
-Den Reboot des DB-Servers erst machen, wenn der "normale" Server wieder hoch gekommen ist und alle Container wieder laufen !  
+Den Reboot des DB-Servers zuerst machen und warten, bis der DB-Server wieder hoch gekommen ist.
   sudo apt update
   sudo apt upgrade
   sudo reboot
@@ -62,8 +62,9 @@ Mach das hier vor dem Upgrade:
   cd platform-complete
   git fetch
   # folio-hbz2, folio-hbz4: war R2-2024-csp-1
+  # folio-hbz3            : war R2-2024-csp-3
 
-Es gibt einen Zweig R1-2025-okapi-csp-3. Den installieren wir.
+Es gibt einen Zweig R1-2025-okapi-csp-4. Den installieren wir.
 Leihe diesen Zweig aus.
 Stecke lokale Änderungen in die Tasche. Das sollte nur stripes.config.js betreffen.
 Verwerfe alle Änderungen, die du vielleicht an den "install-json"-Dateien gemacht hast:
@@ -196,18 +197,18 @@ Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu (editiere install
 [INFO] ------------------------------------------------------------------------
 [INFO] Reactor Summary for okapi 7.0.1:
 [INFO]
-[INFO] okapi .............................................. SUCCESS [ 12.618 s]
-[INFO] okapi-testing ...................................... SUCCESS [ 10.720 s]
-[INFO] okapi-common ....................................... SUCCESS [01:20 min]
-[INFO] okapi-test-module .................................. SUCCESS [  4.991 s]
-[INFO] okapi-test-auth-module ............................. SUCCESS [  6.097 s]
-[INFO] okapi-test-header-module ........................... SUCCESS [  3.883 s]
-[INFO] okapi-core ......................................... SUCCESS [01:00 min]
+[INFO] okapi .............................................. SUCCESS [  7.010 s]
+[INFO] okapi-testing ...................................... SUCCESS [  5.961 s]
+[INFO] okapi-common ....................................... SUCCESS [ 29.726 s]
+[INFO] okapi-test-module .................................. SUCCESS [  4.197 s]
+[INFO] okapi-test-auth-module ............................. SUCCESS [  4.071 s]
+[INFO] okapi-test-header-module ........................... SUCCESS [  2.743 s]
+[INFO] okapi-core ......................................... SUCCESS [ 29.739 s]
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  03:09 min
-[INFO] Finished at: 2026-01-14T19:44:49+01:00
+[INFO] Total time:  01:27 min
+[INFO] Finished at: 2026-01-27T16:44:45+01:00
 [INFO] ------------------------------------------------------------------------
 
  Neustart Okapi
@@ -227,9 +228,14 @@ Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu (editiere install
     mod-licenses:4.2.1
     mod-kb-ebsco-java:3.11.1
     mod-remote-storage:1.6.0
+  - auf folio-hbz3 geht die Anzahl hoch auf 71, da zwei Module nicht installiert wurden: mod-dcb und mod-circulation-item. Dann geht die Anzahl wieder zurück auf 67. Abgestürzt sind nämlich:
+    mod-service-interaction:1.1.0
+    mod-licenses:4.2.1
+    mod-kb-ebsco-java:3.11.1
+    mod-remote-storage:1.6.0
 
  Diese Zahl bezieht sich auf eine Vollinstallation von "Bärlauch".
-   wenn man mod-dcb und mod-circulation-item nicht installiert hat, sind es nur weniger.
+   wenn man mod-dcb und mod-circulation-item nicht installiert hat, sind es weniger.
    Auf folio-hbz5 hatte ich diese beiden Module aber installiert. Auf folio-hbz2 auch.
    Auf folio-hbz4 ist mod-dcb nicht installiert, dafür läuft mod-remote-store zweimal, in zwei unterschiedlichen Versionen (1.6.0 und 3.3.5).
 
@@ -243,7 +249,6 @@ Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu (editiere install
 
 Das ist eine vollständige Plattform von "Bärlauch", sowie die Sonnenblumen-Version des Portals Okapi.
 
-# hier weiter
 ### II.iii) Ziehe die Moduldeskriptorem aus der zentralen Registrierung
 
   # das (alte) Kafka mal abschalten:
@@ -257,7 +262,7 @@ Im Okapi-Log sieht man dann etwas wie:
   13:00:00 INFO  ProxyContent         859422/proxy REQ 127.0.0.1:43518 supertenant POST /_/proxy/pull/modules okapi-7.0.1
   13:00:03 INFO  PullManager          Remote registry at https://folio-registry.dev.folio.org is version 5.0.1
   13:00:03 INFO  PullManager          pull smart
-  13:00:42 INFO  PullManager          pull: 4800 MDs to insert
+  13:00:42 INFO  PullManager          pull: 4337 MDs to insert
   13:00:48 INFO  ProxyContent         859422/proxy RES 200 47478780us okapi-7.0.1 /_/proxy/pull/modules
 ```
   # das (alte) Kafka wieder hochfahren:
@@ -468,12 +473,14 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
    docker build -f docker/Dockerfile --build-arg OKAPI_URL=https://hbz-test.folio.hbz-nrw.de/okapi --build-arg TENANT_ID=diku -t stripes .
    webpack 5.97.1 compiled with 3 warnings in 138699 ms
    Done in 148.20s.
-   Step 21/21 : ENTRYPOINT ["/usr/bin/entrypoint.sh"]
-    ---> Running in 5f333c94b117
-   Removing intermediate container 5f333c94b117
-    ---> 5cbbabdccf11
-   Successfully built 5cbbabdccf11
-   Successfully tagged stripes:latest
+  Step 20/21 : COPY docker/entrypoint.sh /usr/bin/entrypoint.sh
+   ---> 8a04067e9a3a
+  Step 21/21 : ENTRYPOINT ["/usr/bin/entrypoint.sh"]
+  ---> Running in 9b5c3912e9e8
+  Removing intermediate container 9b5c3912e9e8
+   ---> 59e596153bca
+  Successfully built 59e596153bca
+  Successfully tagged stripes:latest
   Das läuft ca. 3 Minuten.
 
   Mache das gleiche für den 2. Mandanten:
@@ -563,8 +570,11 @@ content-length: 112
     (ohne mod-dcb, mod-circulation-item und mod-reporting; ohne mod-mosaic).
     auf folio-hbz5 läuft zusätzlich mod-dcb Bärlauch.
     auf folio-hbz2 142 Module. Es laufen zusätzlich mod-dcb-1.2.9 (Bärlauch), mod-circulation-item-1.1.0 (Bärlauch) und mod-reporting-1.2.1 (Bärlauch).
+    auf folio-hbz3: Es werden 136 Module (= die 139 - 4 fehlende in Bärlauch + mod-reporting in Bärlauch).
+      Diese 4 Bärlauch-Module laufen nicht: mod-agreements, mod-data-export-worker, mod-serials-management und mod-service-interaction.
+         dafür läuft aber mod-reporting-1.2.1 (Bärlauch-Version).
 
-  Diese Anzahl besteht aus 73 Werkstattmodulen der Version Bärlauch und 75 Werkstattmodulen der Version Sonnenblume (ohne mod-mosaic).
+  Diese Anzahl besteht aus 73 Werkstattmodulen der Version Bärlauch und 75 Werkstattmodulen der Version Sonnenblume (ohne mod-mosaic, aber mit mod-marc-migrations).
   Es gibt Modulversionen, die in beiden Plattformversionen vorkommen:
     mod-eusage-reports:3.0.0
     mod-graphql:1.13.1
@@ -587,6 +597,7 @@ content-length: 112
 
   # Quesnelia: Das dauerte 90 Sekunden pro Mandant.
   # folio-hbz2 (Sonnenblume): das dauerte 3-4 Minuten.
+  folio-hbz3: es dauert 5 Minuten und geht rauf auf 44,4 GB Memory used.
    
 
   # mod-marc-migrations-2.0.3 ist nicht hoch gekommen.
@@ -620,20 +631,21 @@ content-length: 112
   Jetzt sind die Module der Sonnenblumen-Version für deinen Mandanten aktiviert:
 
   curl -w '\n' -XGET http://localhost:9130/_/proxy/tenants/diku/modules | grep id | wc
-  157 (154 ohne mod-dcb, mod-circulation-item und mod-reporting)
-  die Ziffer enthält eine Überschriftszeile
+  157 (154 ohne mod-dcb und mod-circulation-item, mit mod-reporting)
 
   Diese Zahl ist die Summe folgender Anzahlen:
 
  Sonnenblume CSP-4 Veröffentlichung
          68 Schaufenstermodule (mit folio_ldp)
        + 12 Kantenmodule
-       + 72 Werkstattmodule (ohne mod-dcb, mod-circulation-item und mod-reporting; ohne mod-mosaic, mit mod-marc-migrations)
-       +  1 Okapi-Modul (Portal) (6.1.3) 
- Summe: 153
+       + 73 Werkstattmodule (ohne mod-dcb, mod-circulation-item ; ohne mod-mosaic, jedoch mit mit mod-marc-migrations und mod-reporting). 
+          mod-reporting wurde in Bärlauch-Version aktiviert, obwohl es nicht in install.json ist (und dort auch eine andere Version hätte).
+       +  1 Okapi-Modul (Portal) (7.0.1) 
+ Summe: 154
 
-  Das sind alle Module der Veröffentlichung R1-2025 "Sonnenblume".
+  Das sind alle Module der Veröffentlichung R1-2025-CSP-4 "Sonnenblume".
 
+      # hier weiter
 ## V. Bringe das neue Vorderende (Schaufenster) an den Start
   Halte den alten Stripes-Container an:
 
@@ -683,6 +695,7 @@ content-length: 112
 ```
   Total reclaimed space: 15.72GB (folio-hbz5)
                          13.43GB (folio-hbz2)
+			 9.472GB  + 3. GB (folio-hbz3)
 
   Entferne alle ungenutzen Behältnisse: Lösche alle Module, die nicht Teil des Veröffentlichungspaketes "Sonnenblume" sind, aus der Entdeckungsschicht des Portals.
   Entferne alte Modulversionen auf dieser Weise:
