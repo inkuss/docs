@@ -833,6 +833,16 @@ transfer-encoding: chunked
 
 {"id":"a6bc77cf-ac2c-4c26-82bf-067883a95691","jobStatus":"In progress","submittedDate":"2026-01-28T10:05:30.274071155Z"}
 
+     Wiederhole diesen POST für weitere Mandanten (s.u.):
+     curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: bthvn" -H "Content-type: ap
+plication/json" -d '{ "recreateIndex": true, "resourceName": "authority", "indexSettings": { "numberOfShards": 2, "numberOfReplicas": 4, "refreshInterval": 1 } }' http://localhost:9130/search/index/inventory/reindex
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Tue, 03 Feb 2026 12:05:36 GMT
+transfer-encoding: chunked
+
+{"id":"55479ba1-c307-49c3-b9d4-b488f202b7c8","jobStatus":"In progress","submittedDate":"2026-02-03T12:05:32.959796238Z"}
+
        # Updating index settings
     Der Admin-User benötigt hierfür die Berechtigung: search.index.settings.item.put
     Wie die Berechtigung vergeben wird, siehe hier: https://dienst-wiki.hbz-nrw.de/spaces/BMS/pages/1206091816/Berechtigungen+vergeben
@@ -843,8 +853,7 @@ Date: Wed, 28 Jan 2026 10:38:22 GMT
 transfer-encoding: chunked
 
 {"status":"success"}
-
- 
+     
   # Monitoring authority reindex process
        curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: diku" -H "Content-type: application/json" http://localhost:9130/authority-storage/reindex/a6bc77cf-ac2c-4c26-82bf-067883a95691
        HTTP/1.1 200 OK
@@ -922,6 +931,33 @@ transfer-encoding: chunked
 
   Wiederhole den Reindexierungsprozess für andere Mandanten, die du vielleicht auf deinem Server beherbergst, und die auch zur Sonnenblume migriert sind.
 
+  Für den Mandanten bthvn kommt, wenn ich den Status des Inventory-Reindex überprüfen will:
+
+  curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: bthvn" -H "Content-type: application/json" http://localhost:9130/search/index/instance-records/reindex/status
+  HTTP/1.1 500 Internal Server Error
+  Content-Type: text/plain
+  content-length: 134
+
+  proxyClient failure: mod-search-5.0.7 http://10.9.2.86:19070: Connection was closed: GET /search/index/instance-records/reindex/status
+  Dann geht es:
+  curl -w '\n' -D - -X GET -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: bthvn" -H "Content-type: application/json" http://localhost:9130/search/index/instance-records/reindex/status
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Tue, 03 Feb 2026 12:56:48 GMT
+transfer-encoding: chunked
+
+[{"entityType":"INSTANCE","status":"UPLOAD_IN_PROGRESS","totalMergeRanges":0,"processedMergeRanges":0,"totalUploadRanges":0,"processedUploadRanges":0,"startTimeUpload":"2026-02-03T12:25:22.692Z"},{"entityType":"SUBJECT","status":"UPLOAD_COMPLETED","totalMergeRanges":0,"processedMergeRanges":0,"totalUploadRanges":4096,"processedUploadRanges":4101,"startTimeUpload":"2026-02-03T12:25:22.977Z","endTimeUpload":"2026-02-03T12:27:04.631Z"},{"entityType":"CONTRIBUTOR","status":"UPLOAD_COMPLETED","totalMergeRanges":0,"processedMergeRanges":0,"totalUploadRanges":4096,"processedUploadRanges":4101,"startTimeUpload":"2026-02-03T12:25:23.001Z","endTimeUpload":"2026-02-03T12:27:04.504Z"},{"entityType":"CLASSIFICATION","status":"UPLOAD_COMPLETED","totalMergeRanges":0,"processedMergeRanges":0,"totalUploadRanges":4096,"processedUploadRanges":4096,"startTimeUpload":"2026-02-03T12:26:37.900Z","endTimeUpload":"2026-02-03T12:27:10.208Z"},{"entityType":"CALL_NUMBER","status":"UPLOAD_COMPLETED","totalMergeRanges":0,"processedMergeRanges":0,"totalUploadRanges":4096,"processedUploadRanges":4096,"startTimeUpload":"2026-02-03T12:26:37.870Z","endTimeUpload":"2026-02-03T12:27:09.868Z"}]
+
+  Wenn ich versuche, den Reindex ein 2. Mal anzustoßen, kommt:
+  curl -w '\n' -D - -X POST -H "x-okapi-token: $TOKEN" -H "X-Okapi-Tenant: bthvn" -H "Content-type: application/json" -d '{"entityTypes": ["instance", "subject", "contributor", "classification", "call-number"]}' http://localhost:9130/search/index/instance-records/reindex/upload
+  HTTP/1.1 400 Bad Request
+  Content-Type: application/json
+  Date: Tue, 03 Feb 2026 12:30:37 GMT
+  Connection: close
+  transfer-encoding: chunked
+
+  {"errors":[{"message":"Reindex Upload in Progress","type":"RequestValidationException","code":"validation_error","parameters":[{"key":"entityType","value":"instance"}]}],"total_records":1}
+
 ### VII.iii) Veraltete Berechtigungen löschen
  POST-Upgrade:
  Problem: mod-users-bl stürzt wiederholt ab bei Versuchen, sich anzumelden
@@ -943,11 +979,26 @@ transfer-encoding: chunked
   "totalRecords" : 4565
 }
 
+  das auch für weitere Mandanten ausführen. btvhn: "totalRecords" : 3462
+
   (während im Okapi-Log:)
 19:00:03 [] [] [] [] INFO  ?                    mod-permissions-6.7.0 18:00:03 [588496/perms] [diku] [4e3dd2f7-f8de-45d2-bdc6-734084470a42] [mod_permissions] INFO  RestRouting          invoking postPermsPurgeDeprecated
 
  # 2. Reinstalliere mod-permissions
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '[ { "id": "mod-permissions-6.7.0", "action": "enable" } ]' http://localhost:9130/_/proxy/tenants/diku/install?reinstall=true
+HTTP/1.1 200 OK
+Content-Type: application/json
+content-length: 99
+
+[ {
+  "id" : "mod-permissions-6.7.0",
+  "from" : "mod-permissions-6.7.0",
+  "action" : "enable"
+} ]
+
+  Das auch für weitere Mandanten ausführen.
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '[ { "id": "mod-permissions-6.7.0",
+ "action": "enable" } ]' http://localhost:9130/_/proxy/tenants/bthvn/install?reinstall=true
 HTTP/1.1 200 OK
 Content-Type: application/json
 content-length: 99
