@@ -468,6 +468,7 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
    vim stripes.config.js
        - aboutInstallVersion anpassen => Sonnenblume
        - aboutInstallDate auf aktuelles Datum ändern
+       - locale: 'de-DE'  , neuen Parameter einfügen
    sudo su
    # Baue den Docker-Container, der Stripes und nginx enthalten wird:
    docker build -f docker/Dockerfile --build-arg OKAPI_URL=https://hbz-test.folio.hbz-nrw.de/okapi --build-arg TENANT_ID=diku -t stripes .
