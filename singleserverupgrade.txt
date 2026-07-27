@@ -44,7 +44,6 @@ Prüfe, ob alle Dienste nach dem Reboot neu gestartet wurden: <em>Okapi, postgre
 Dies sind die offiziellen [Sonnenblume wichtige Upgrade-Erwägungen](https://folio-org.atlassian.net/wiki/spaces/REL/pages/399081687/Sunflower+R1+2025+Important+upgrade+considerations)
 Mach das hier vor dem Upgrade:
 
-  folio-demo: im Inventory ist: Source: FOLIO 80, MARC 5.
 ### I.ii) Aus den offiziellen Sonnenblumen Veröffentlichungshinweisen:
 #### 1.) mod-users-bl
   (Okapi) curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"EUREKA_LOGIN_PERMS\",\"value\":\"false\"}" http://localhost:9130/_/env
@@ -61,84 +60,25 @@ Mach das hier vor dem Upgrade:
  Hole die neue Version von "platform-complete", wechsele in das Verzeichnis:
   cd platform-complete
   git fetch
-  # folio-hbz2, folio-hbz4: war R2-2024-csp-1
-  # folio-hbz3            : war R2-2024-csp-3
 
-Es gibt einen Zweig R1-2025-okapi-csp-4. Den installieren wir.
+Es gibt einen Zweig R1-2025-okapi-csp-8. Den installieren wir.
 Leihe diesen Zweig aus.
 Stecke lokale Änderungen in die Tasche. Das sollte nur stripes.config.js betreffen.
 Verwerfe alle Änderungen, die du vielleicht an den "install-json"-Dateien gemacht hast:
 
-  git restore install.json
+  # git restore install.json
   git restore okapi-install.json
   git restore stripes-install.json
   git restore package.json
  
   git stash save
-  git checkout R1-2025-okapi-csp-4 (vom 23. Dezember 2025)
+  git checkout R1-2025-okapi-csp-8 (vom 30. Juni 2026)
   git stash pop
 
-Den Zusammenführungs-Konflikt in stripes.config.js beheben.
+Die Zusammenführungs-Konflikte in stripes.config.js und install.json beheben.
 
-Folgende Änderungen haben von R1-2025-okapi-csp-3 auf R1-2025-okapi-csp-4 stattgefunden:
-diff /tmp/install.json install.json
-41c41
-<   "id" : "mod-licenses-6.2.2",
----
->   "id" : "mod-licenses-6.2.3",
-53c53
-<   "id" : "mod-source-record-storage-5.10.11",
----
->   "id" : "mod-source-record-storage-5.10.12",
-77c77
-<   "id" : "mod-login-7.13.0",
----
->   "id" : "mod-login-7.13.1",
-95c95
-<   "id" : "mod-service-interaction-4.2.2",
----
->   "id" : "mod-service-interaction-4.2.3",
-110c110
-<   "id" : "mod-agreements-7.2.2",
----
->   "id" : "mod-agreements-7.2.3",
-206c206
-<   "id" : "mod-source-record-manager-3.10.7",
----
->   "id" : "mod-source-record-manager-3.10.8",
-281c281
-<   "id" : "mod-serials-management-2.0.3",
----
->   "id" : "mod-serials-management-2.0.4",
-287,289d286
-<   "id" : "mod-marc-migrations-2.0.3",
-<   "action" : "enable"
-< }, {
-350c347
-<   "id" : "mod-patron-6.3.2",
----
->   "id" : "mod-patron-6.3.3",
-456,461d452
-<   "action" : "enable"
-< }, {
-<   "id" : "mod-mosaic-1.0.0",
-<   "action" : "enable"
-< }, {
-<   "id" : "folio_mosaic-settings-1.0.0",
+  mod-marc-migrations, mod-mosaic und folio_mosaic-settings (alle neu in Sonnenblume) sind in neueren Service-Packs wieder herausgeflogen.
 
-D.h.  mod-marc-migrations, mod-mosaic und folio_mosaic-settings (alle neu in Sonnenblume) sind wieder herausgeflogen. Außerdem habe 8 Module ein Versionsupdate bekommen.
-
-Füge mod-marc-migrations auf mein eigenes Risiko wieder hinzu (editiere install.json):
-}, {
-  "id" : "folio_serials-management-2.0.4",
-  "action" : "enable"
-}, {
-  "id" : "mod-marc-migrations-2.0.3",
-  "action" : "enable"
-}, {
-  "id" : "mod-reading-room-1.2.1",
-  "action" : "enable"
-}, {
 
 ### II.ii) Aufdatierung Okapi
   Die Okapi-Version hochziehen und Okapi neu starten.
@@ -303,7 +243,7 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
   SYSTEM_USER_PASSWORD={SYSTEM_USER_PASSWORD}
   cd ~/folio-install
   # 1. Kopiere den Moduldeskriptor in eine Datei
-  curl -w '\n' -D -  http://localhost:9130/_/proxy/modules/mod-bulk-operations-2.2.8 > mod-bulk-operations-2.2.8-module-descriptor.json
+  curl -w '\n' -D -  http://localhost:9130/_/proxy/modules/mod-bulk-operations-2.2.10 > mod-bulk-operations-2.2.10-module-descriptor.json
   # 2. Füge bei JAVA_OPTIONS etc. hinzu ... (s.o.)
   # 2a. Falls Modul schon läuft: deaktivieren
   # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '[ { "id" : "mod-authtoken-2.9.1", "action" : "disable" } ]' http://localhost:9130/_/proxy/tenants/diku/install?simulate=true
@@ -312,9 +252,9 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
   # 2b. Falls Modul schon läuft: Undeploy
   # curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-authtoken-2.9.1
   # 3. Lösche den bisherigen Moduldeskriptor:
-  curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-bulk-operations-2.2.8
+  curl -X DELETE -D - -w '\n' http://localhost:9130/_/proxy/modules/mod-bulk-operations-2.2.10
   # 4. Sende den neuen Moduldeskriptor an /_/proxy/modules
-   curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-bulk-operations-2.2.8-module-descriptor.json http://localhost:9130/_/proxy/modules
+   curl -i -w '\n' -X POST -H 'Content-type: application/json' -d @mod-bulk-operations-2.2.10-module-descriptor.json http://localhost:9130/_/proxy/modules
   # 5. Falls Modul schon lief: Redeploy, Reaktivierung
   # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '[{ "id": "mod-authtoken-2.9.1", "action": "enable"}]' http://localhost:9130/_/proxy/tenants/diku/install?simulate=true\&preRelease=false
   # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d '[{ "id": "mod-authtoken-2.9.1", "action": "enable"}]' http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadSample%3Dfalse%2CloadReference%3Dtrue
@@ -337,12 +277,12 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
 #### iii. OAI-PMH (mod-oai-pmh) Konfiguration.
   Das muss man natürlich nur machen, wenn man die OAI-Schnittstelle auch tatsächlich benutzen will.
   Um staibl arbeiten zu könnnen benötigt mod-oai-pmh die folgende Speicherkonfiguration:
-  Editiere mod-oai-pmh-3.15.3-module-descriptor.json
+  Editiere mod-oai-pmh-3.15.6-module-descriptor.json
 
   JAVA_OPTIONS: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx2160m
 
   Die Speichereinstellungen für edge-oai-pmh sind dieselben wie in vorhergehenden Versionen:
-  Editiere edge-oai-pmh-2.11.0-module-descriptor.json
+  Editiere edge-oai-pmh-2.11.1-module-descriptor.json
 
   JAVA_OPTIONS: -XX:MetaspaceSize=384m -XX:MaxMetaspaceSize=512m -Xmx1440m
 
@@ -367,7 +307,7 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
     
   Hast du dagegen ENV = folio gesetzt, dann setze  KAFKA_EVENTS_CONSUMER_PATTERN = (folio.)(.*.)inventory.(instance|holdings-record|item|bound-with)
 
- zusätzlich in mod-search-5.0.7
+ zusätzlich in mod-search-5.0.13
   Setze KAFKA_EVENTS_CONSUMER_PATTERN = (sunflower\\.)(.*\\.)inventory\\.(instance|holdings-record|item|bound-with)
   Setze andere CONSUMER_PATTERNS im Moduldeskriptor ebenfalls, auf einen äquivalenten Wert.
   Setze SEARCH_BY_ALL_FIELDS_ENABLED auf "wahr" ("true"), wenn du die Suchoption "alle" aktivieren möchtest (suche in allen Feldern). Standardmäßig ist die Suche "in allen Feldern" ausgestellt.
@@ -375,14 +315,14 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
   Setze MAX_SEARCH_BATCH_REQUEST_IDS_COUNT auf 20000 (es steht fälschlicherweise auf 20_000)
 
 #### vi. mod-agreements
-  Vergrößere den Speicher im Hochfahrdeskriptor von mod-agreements-7.2.3 auf 8 GB, wenn du FOLIO mit einer GoKB verbinden möchtest.
+  Vergrößere den Speicher im Hochfahrdeskriptor von mod-agreements-7.2.8 auf 8 GB, wenn du FOLIO mit einer GoKB verbinden möchtest.
 
   "dockerArgs" : {
       "HostConfig" : {
         "Memory" : 8589934592,
 
 #### vii. E-Mail-Konfiguration für Versand über hbz-SMTP-Server in mod-email anlegen
-  in den Moduldeskriptor von mod-email-1.19.0  einfügen (aus bisherigem Moduldeskriptor mod-email-1.18.1 kopieren):
+  in den Moduldeskriptor von mod-email-1.19.1  einfügen (aus bisherigem Moduldeskriptor mod-email-1.18.1 kopieren):
     }, {
       "name" : "FOLIO_HOST",
       "value" : ""
@@ -432,7 +372,7 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
   curl -w '\n' -D - -X POST -H "Content-Type: application/json" -d "{\"name\":\"LIST_APP_S3_BUCKET\",\"value\":\"hbz-test\"}" http://localhost:9130/_/env
 
 #### ix. Token- und Passwort maximale Gültigkeitszeitdauer
-  mod-users-bl-7.10.3
+  mod-users-bl-7.10.4
   Vor oder nach dem Upgrade:
   Das Zeichen im "Passwort-Zurücksetzen"-Link läuft früh ab. Stelle sicher, dass mod-users-bl’s RESET_PASSWORD_LINK_EXPIRATION_TIME (Standard: 24 Stunden) nicht größer ist als mod-authtoken’s token.expiration.seconds (Standard: 10 Minuten, aber von mir auf 1 Stunde hoch gesetzt)
    - eine ENV-Variable im Moduldeskriptor hinzufügen:
@@ -443,7 +383,7 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
 
 #### x. Falsche Umgebungsvariable (Zeichenkette statt ganzzahlig) in mod-marc-migrations
 
-  # Konfiguriere mod-marc-migrations
+  # Konfiguriere mod-marc-migrations => Modul wurde in höheren Service Packs entfernt.
   cd ~/folio-install
   # 1. Kopiere den Moduldeskriptor in eine Datei
   curl -w '\n' -D -  http://localhost:9130/_/proxy/modules/mod-marc-migrations-2.0.3 > mod-marc-migrations-2.0.3-module-descriptor.json
@@ -472,29 +412,52 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
    sudo su
    # Baue den Docker-Container, der Stripes und nginx enthalten wird:
    docker build -f docker/Dockerfile --build-arg OKAPI_URL=https://hbz-test.folio.hbz-nrw.de/okapi --build-arg TENANT_ID=diku -t stripes .
-   webpack 5.97.1 compiled with 3 warnings in 114383 ms
-   Done in 123.86s.
-   Step 20/21 : COPY docker/entrypoint.sh /usr/bin/entrypoint.sh
-    ---> 23dceee43e1e
-   Step 21/21 : ENTRYPOINT ["/usr/bin/entrypoint.sh"]
-    ---> Running in 8ca13b8a18be
-   Removing intermediate container 8ca13b8a18be
-    ---> 8da4874e6a68
-   Successfully built 8da4874e6a68
-   Successfully tagged stripes:latest
-  Das läuft ca. 3 Minuten.
+ => ERROR [stripes_build  8/10] RUN yarn install                                                                  32.3s
+------
+ > [stripes_build  8/10] RUN yarn install:
+0.580 yarn install v1.22.22
+0.846 [1/4] Resolving packages...
+1.479 [2/4] Fetching packages...
+31.19 warning chart.js@4.4.7: The engine "pnpm" appears to be invalid.
+31.20 error undici@7.28.0: The engine "node" is incompatible with this module. Expected version ">=20.18.1". Got "18.20.8"
+31.22 error Found incompatible module.
+31.22 info Visit https://yarnpkg.com/en/docs/cli/install for documentation about this command.
+------
+
+ 1 warning found (use docker --debug to expand):
+ - FromAsCasing: 'as' and 'FROM' keywords' casing do not match (line 1)
+Dockerfile:20
+--------------------
+  18 |
+  19 |     RUN yarn config set @folio:registry https://repository.folio.org/repository/npm-folioci/
+  20 | >>> RUN yarn install
+  21 |     RUN yarn build-module-descriptors
+  22 |     RUN yarn build output --okapi $OKAPI_URL --tenant $TENANT_ID
+--------------------
+ERROR: failed to solve: process "/bin/sh -c yarn install" did not complete successfully: exit code: 1
+  
+  vim docker/Dockerfile
+  -FROM node:18-alpine as stripes_build
+  +FROM node:22-alpine as stripes_build
+   docker build -f docker/Dockerfile --build-arg OKAPI_URL=https://hbz-test.folio.hbz-nrw.de/okapi --build-arg TENANT_ID=diku -t stripes .
+ => [stage-1 5/6] COPY docker/nginx.conf /etc/nginx/conf.d/default.conf                                            0.3s
+ => [stage-1 6/6] COPY docker/entrypoint.sh /usr/bin/entrypoint.sh                                                 0.2s
+ => exporting to image                                                                                             0.7s
+ => => exporting layers                                                                                            0.6s
+ => => writing image sha256:84a03eeb278a3b01d1a9fc534b0f1f77297cb617a1aa3466e613d1ff2f4f8e04                       0.1s
+ => => naming to docker.io/library/stripes 
+
 
   Mache das gleiche für den 2. Mandanten:
    cd ~/platform-complete-bthvn
    git status
-   git restore install.json
    git restore okapi-install.json
    git restore stripes-install.json
    git restore package.json
  
    git fetch origin
    git stash save
-   git checkout R1-2025-okapi-csp-3 (vom 3. Dezember 2025)
+   git checkout R1-2025-okapi-csp-8 (vom 30. Juni 2026)
    git stash pop
 
    Wir benutzen das Dockerfile in platform-complete-bthvn/docker.
@@ -502,7 +465,7 @@ Setze DB_CONNECTION_TIMEOUT mindestens auf 250, sonst kommt mod-entities-links n
    Wenn letzesmal erfolgreich installiert wurde, sollte jetzt nichts zu ändern sein. Einfach "git diff" machen.
    git diff
    vim stripes.config.js
-       - aboutInstallVersion anpassen => Bärlauch
+       - aboutInstallVersion anpassen
        - aboutInstallDate auf aktuelles Datum ändern
    sudo su
    # Baue den Docker-Container, der Stripes und nginx enthalten wird:
@@ -553,7 +516,7 @@ content-length: 112
 } ]
       Sonst kommt
          Some modules cannot be topological sorted: mod-ldp-1.1.3
-  Das auch für bthvn-Mandanten gemacht.
+  Das auch für bthvn-Mandanten machen.
 
   # Falls vergessen, die Module nachträglich deaktivieren:
   # curl -w '\n' -D - -X POST -H "Content-type: application/json" -d "[{\"id\":\"mod-dcb-1.1.6\",\"action\":\"disable\"},{\"id\":\"mod-circulation-item-1.0.0\",\"action\":\"disable\"},{\"id\":\"edge-dcb-1.1.3\",\"action\":\"disable\"}]" http://localhost:9130/_/proxy/tenants/wdr/install?simulate=true\&preRelease=false
@@ -564,10 +527,12 @@ content-length: 112
   Das wird alle neuen Module aufstellen und aktivieren. Beginne mit einem Simualtionslauf:
 
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?simulate=true\&preRelease=false
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete-bthvn/install.json http://localhost:9130/_/proxy/tenants/bthvn/install?simulate=true\&preRelease=false
 
   Dann wiederhole die gleiche Anfrage mit "deploy=true": 
 
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dfalse
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete-bthvn/install.json http://localhost:9130/_/proxy/tenants/bthvn/install?deploy=true\&preRelease=false\&tenantParameters=loadReference%3Dfalse
 
   Diese Anfrage wird fehlschlagen, weil Schaufenstermodule nicht von Docker aufgestellt werden können. - Wir machen diese Anfrage trotzdem.
   Sie werden folgende Nachricht vom System erhalten:
@@ -579,7 +544,9 @@ content-length: 112
 
   docker ps | grep mod- | wc
 
-  Es sollten 139 Module werden, bevor du weiter machst.
+  Beim Upgrade von Sonnenblume CSP-3 nach Sonnenblume CSP-8 werden es 125 Module.
+  Dabei wurde aber kein Modul in derselben Version mehrfach installiert.
+  ## Es sollten 139 Module werden, bevor du weiter machst (Bärlauch => Sonnenblume).
     (ohne mod-dcb, mod-circulation-item und mod-reporting; ohne mod-mosaic).
     auf folio-hbz5 läuft zusätzlich mod-dcb Bärlauch.
     auf folio-hbz2 142 Module. Es laufen zusätzlich mod-dcb-1.2.9 (Bärlauch), mod-circulation-item-1.1.0 (Bärlauch) und mod-reporting-1.2.1 (Bärlauch).
@@ -606,6 +573,8 @@ content-length: 112
   # Memory auf dem Single Server muss auf 64 GB sein, 40 GB ist zu wenig.
 
   curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete/install.json http://localhost:9130/_/proxy/tenants/diku/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
+  curl -w '\n' -D - -X POST -H "Content-type: application/json" -d @$HOME/platform-complete-bthvn/insta
+ll.json http://localhost:9130/_/proxy/tenants/bthvn/install?deploy=false\&preRelease=false\&tenantParameters=loadReference%3Dtrue
 
   Wenn das fehlschlägt, finde den Grund dafür heraus, behebe die Fehlerursache und versuche es erneut, bis die Anfrage erfolgreich war.
 
@@ -632,7 +601,7 @@ content-length: 112
 
 
 
-  Wiederhole diesen Schritt für eventuelle weitere Mandanten (solche, die ebenfalls platform-complete installiert haben) auf deinem System.
+  Wiederhole diese Schritte für eventuelle weitere Mandanten (solche, die ebenfalls platform-complete installiert haben) auf deinem System.
 
   Alte Module, die noch laufen, aber nun nicht mehr benötigt werden, werden wir im "Aufräum"-Kapitel entfernen.
  
@@ -650,7 +619,7 @@ content-length: 112
 
   Diese Zahl ist die Summe folgender Anzahlen:
 
- Sonnenblume CSP-4 Veröffentlichung
+ Sonnenblume CSP-8 Veröffentlichung
          68 Schaufenstermodule (mit folio_ldp)
        + 12 Kantenmodule
        + 73 Werkstattmodule (ohne mod-dcb, mod-circulation-item ; ohne mod-mosaic, jedoch mit mit mod-marc-migrations und mod-reporting). 
@@ -658,7 +627,7 @@ content-length: 112
        +  1 Okapi-Modul (Portal) (7.0.1) 
  Summe: 154
 
-  Das sind alle Module der Veröffentlichung R1-2025-CSP-4 "Sonnenblume".
+  Das sind alle Module der Veröffentlichung R1-2025-CSP-8 "Sonnenblume".
 
 ## V. Bringe das neue Vorderende (Schaufenster) an den Start
   Halte den alten Stripes-Container an:
@@ -684,7 +653,7 @@ content-length: 112
     docker stop stripes_bthvn
     docker rm stripes_bthvn
     nohup docker run -d -p 90:80 --name stripes_bthvn stripes_bthvn &
-    systemctl status stripes_btvhn
+    # systemctl status stripes_btvhn
 
   Das System wieder ans Netz bringen (auf folio-proxy).
   Browser-Cache löschen.
@@ -692,7 +661,7 @@ content-length: 112
 
   - Sehen Sie die Sonnenblumen-Module in Einstellungen - Installationsdetails ?
 
-  - Sehen Sie die richtige Okapi-Version, 7.0.1 ? 
+  - Sehen Sie die richtige Okapi-Version, 7.0.1 (v6.2.9) ? 
 
   - Sieht auch sonst alles gut aus ?
 
@@ -710,6 +679,7 @@ content-length: 112
   Total reclaimed space: 15.72GB (folio-hbz5)
                          13.43GB (folio-hbz2)
 			 9.472GB  + 4.026 GB (folio-hbz3)
+			Total reclaimed space: 29.41GB (CSP-8)
 
   Entferne alle ungenutzen Behältnisse: Lösche alle Module, die nicht Teil des Veröffentlichungspaketes "Sonnenblume" sind, aus der Entdeckungsschicht des Portals.
   Entferne alte Modulversionen auf dieser Weise:
@@ -720,76 +690,23 @@ curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-audit-
 curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-users-bl-7.9.3
 ```
 
-  Das sind 69 Module von "Bärlach" : alle 73 Bärlauch-Module bis auf die 3, die auch in Sonnenblume vorkommen.
-    Wir behalten außerdem mod-reporting-1.2.1 (Bärlauch-Version), da es ohnehin aufgestellt und aktiviert ist,
-      und da auch das zugehörige Frontend-Modul, folio_ldp-2.3.0, aktiviert ist.
-  Außerdem auf folio-hb5 noch 5 Kantenmodule, die in niedrigerer Version noch aufgestellt sind:
-     Finde sie heraus mit:
-     docker ps | grep edge- | sort -k 2
-  Auf folio-hbz2 sind es dieselben Kantenmodule. Auf folio-hbz4 ebenfalls.
-  Auf folio-hbz3 sind es dieseblben Kantenmodule, edge-patron jedoch in der etwas neueren Version 5.2.2.
-
-   Auf folio-hbz4 müssen zusätzlich noch diese noch älteren Module entfernt werden:
-      mod-service-interaction:1.1.0
-      mod-licenses:4.2.1
-      mod-kb-ebsco-java:3.11.1
-      mod-remote-storage:1.6.0
-
-   Ich habe dieses Skript erzeugt und ausgeführt. Es enthält nur (und alle) Bärlauch-Instanzen, die nicht auch Teil von Sonnenblume sind, sowie die überzähligen Kantenmodule.
-   Alle 75 jetzt noch zu löschenden Module (inkl. Kantenmodule) stehen in diesem Skript:
+   Ich habe dieses Skript erzeugt und ausgeführt. Es enthält nur (und alle) Sonnenblume-CSP-3-Modulversionen, die nicht auch Teil von Sonnenblume-CSP-8 sind, sowie die überzähligen Kantenmodule.
+   Alle 57 jetzt zu löschenden Module (52 Werkstatt-Module + 5 Kantenmodule) stehen in diesem Skript:
    cd ~/folio-install
-   ./dockerps.todelete.desBärlauch.sh
-
-   folio-hbz2, folio-hbz4: mod-circulation-item-1.1.0 lässt sich nicht aus dem Discovery entfernen. Ich halte den Container an: docker stop 7313f4b3c826
-   folio-hbz3: 17 Hinterhofmodule zu wenig wurden gelöscht.
-     Bärlach CSP-3 unterscheidet sich in mindesten 17 Modulen (plus evtl. die, die ich nicht installiert hattebzw. die nicht (mehr) liefen) von Bärlauch CSP-1:
-     1,17c1,17
-< mod-bulk-operations-2.1.12
-< mod-circulation-24.3.15
-< mod-circulation-storage-17.3.5
-< mod-data-export-spring-3.4.3
-< mod-di-converter-storage-2.3.1
-< mod-fqm-manager-3.0.12
-< mod-inventory-21.0.12
-< mod-inventory-storage-28.0.9
-< mod-licenses-6.1.3
-< mod-orders-storage-13.8.3
-< mod-patron-6.2.10
-< mod-patron-blocks-1.11.2
-< mod-record-specifications-1.0.3
-< mod-search-4.0.11
-< mod-source-record-storage-5.9.12
-< mod-users-19.4.5
-< mod-users-bl-7.9.3
----
-> mod-bulk-operations-2.1.13
-> mod-circulation-24.3.18
-> mod-circulation-storage-17.3.6
-> mod-data-export-spring-3.4.4
-> mod-di-converter-storage-2.3.2
-> mod-fqm-manager-3.0.13
-> mod-inventory-21.0.15
-> mod-inventory-storage-28.0.13
-> mod-licenses-6.1.4
-> mod-orders-storage-13.8.4
-> mod-patron-6.2.12
-> mod-patron-blocks-1.11.3
-> mod-record-specifications-1.0.4
-> mod-search-4.0.13
-> mod-source-record-storage-5.9.16
-> mod-users-19.4.6
-> mod-users-bl-7.9.4
+   ./dockerps.todelete.derSonnenblumeCSP3.sh
+   - mod-marc-migrations-2.0.3 und mod-mosaic-1.0.0 wurden auf folio-hbz5 nicht entfernt, obowohl nicht aktiviert.
+   - 22 Module (mit mod-marc-migrations und mod-mosaic) sind noch die gleichen Versionen in CSP-8 wie in CSP-3.
 
    Diese ganze Modulzählerei dauert ewig. Über 70 Module in je zwei verschiedenen Versionen sind mehrfach auf Existenz und Ansprechbarkeit (Aktivierung) zu prüfen. Das ganze ist auf jedem Server wieder leicht unterschiedlich, da sich die CSPs zum Teil beträchtlich unterscheiden, was die Versionen der einzelnen Module angeht.
 
    (Jetzt könnte man mod-reporting und folio_ldp dazu installieren. Auf folio-hbz3 ist das geschehen, wenn auch in Bärlauch-Version.)
 
 ### Ergebnis
-  Für "Sonnenblumen"-Auskopplung, CSP-4
-  75 Werkstattmodule, "mod-\*" enthält die Liste install.json (72 ohne mod-dcb, mod-circulation-item und mod-reporting).
-  Diese 72 Werkstattmodule sind jetzt für deinen Mandanten aktiviert.
-  72 Behältnisse für diese Module laufen in deinem Hafenarbeiter-System.
-  - auf folio-hbz3 sind es 73 Werkstattmodule, da wir zusätzlich mod-reporting-1.2.1 (Bärlauch-Version) installiert haben.
+  Für "Sonnenblumen"-Auskopplung, CSP-8
+  71 Werkstattmodule, "mod-\*" enthält die Liste install.json (ohne mod-mosaic, mod-marc-migrations, mod-dcb, mod-circulation-item und mod-reporting).
+  Diese 71 Werkstattmodule sind jetzt für deinen Mandanten aktiviert.
+  71 Behältnisse für diese Module laufen in deinem Hafenarbeiter-System.
+  - auf folio-hbz5 sind es 73 Werkstattmodule, da wir zusätzlich mod-marc-migrations und mod-mosaic installiert haben.
 
   Hole dir schließlich noch einmal eine Liste der aufgestellten Werkstattmodule:
   
@@ -797,15 +714,14 @@ curl -w '\n' -D - -X DELETE http://localhost:9130/_/discovery/modules/mod-users-
   curl -w '\n' -D - http://localhost:9130/_/discovery/modules | grep srvcId | grep mod- | wc
  73
   ```
-  mod-circuation-item ist drin und läßt sich nicht entfernen.
   
   Vergleiche diese Anzahl mit der deiner laufenden Hafenarbeiter-Behältnisse:
   
   ```
   docker ps | grep "mod-" | wc
-    72
+    73
   ```
-  (73 mit mod-circulation-item oder mod-reporting)
+  (73 mit mod-marc-migrations und mod-mosaic)
 
   Führe eine Gesundheitsprüfung durch:
   ```
@@ -877,6 +793,7 @@ transfer-encoding: chunked
 {"id":"64a7c686-d957-4545-8fa1-8e0e8cba0921","jobStatus":"Completed","submittedDate":"Wed Jan 28 10:15:52 GMT 2026"}
 
 ### VII.iii) Neuaufbau des "Elasticsearch"-Indexes "Inventar"
+  das musste man für hbz-test beim Service Pack Update nicht machen.
 
   Nach dem Upgrade muss eine neue API benutzt werden, um die Titeldatensätze zu indexieren.
   Der alte Endpoint /search/index/inventory/reindex funktioniert nicht mehr.
